@@ -2,7 +2,7 @@
 namespace duckdb {
 
 struct StartServerFunctionData final : FunctionData {
-	StartServerFunctionData(const string &_host, const uint64_t _port) : host(_host), port(_port) {
+	StartServerFunctionData(const string &_host, const int32_t _port) : host(_host), port(_port) {
 	}
 
 	unique_ptr<FunctionData> Copy() const override {
@@ -15,7 +15,7 @@ struct StartServerFunctionData final : FunctionData {
 	}
 
 	const std::string host;
-	const uint64_t port;
+	const int32_t port;
 };
 
 struct EmptyFunctionData final : FunctionData {
@@ -36,7 +36,7 @@ struct RunOnceGlobalTableFunctionState final : GlobalTableFunctionState {
 	}
 };
 
-auto StartHttpServer = [](ClientContext &context, TableFunctionInput &data, DataChunk &output) {
+inline void StartHttpServer(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
 	auto &g_state = data.global_state->Cast<RunOnceGlobalTableFunctionState>();
 	if (g_state.has_run.exchange(true)) {
 		return;
@@ -48,17 +48,17 @@ auto StartHttpServer = [](ClientContext &context, TableFunctionInput &data, Data
 
 	output.SetCardinality(1);
 	output.SetValue(0, 0, true);
-};
+}
 
-auto BindStopHttpServer = [](ClientContext &, TableFunctionBindInput &input, vector<LogicalType> &return_types,
-                             vector<string> &names) -> unique_ptr<FunctionData> {
+inline unique_ptr<FunctionData> BindStopHttpServer(ClientContext &, TableFunctionBindInput &,
+                                                   vector<LogicalType> &return_types, vector<string> &names) {
 	return_types.push_back(LogicalType::BOOLEAN);
 	names.push_back("success");
 
 	return make_uniq_base<FunctionData, EmptyFunctionData>();
-};
+}
 
-auto StopHttpServer = [](ClientContext &context, TableFunctionInput &data, DataChunk &output) {
+inline void StopHttpServer(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
 	auto &g_state = data.global_state->Cast<RunOnceGlobalTableFunctionState>();
 	if (g_state.has_run.exchange(true)) {
 		return;
@@ -68,10 +68,10 @@ auto StopHttpServer = [](ClientContext &context, TableFunctionInput &data, DataC
 
 	output.SetCardinality(1);
 	output.SetValue(0, 0, true);
-};
+}
 
-auto BindStartHttpServer = [](ClientContext &, TableFunctionBindInput &input, vector<LogicalType> &return_types,
-                              vector<string> &names) -> unique_ptr<FunctionData> {
+inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFunctionBindInput &input,
+                                                    vector<LogicalType> &return_types, vector<string> &names) {
 	auto host = input.inputs[0].GetValue<string>();
 	auto port = input.inputs[1].GetValue<uint64_t>();
 
@@ -79,6 +79,6 @@ auto BindStartHttpServer = [](ClientContext &, TableFunctionBindInput &input, ve
 	names.push_back("success");
 
 	return make_uniq_base<FunctionData, StartServerFunctionData>(host, port);
-};
+}
 
 } // namespace duckdb
