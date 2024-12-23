@@ -44,7 +44,7 @@ inline void StartHttpServer(ClientContext &context, TableFunctionInput &data, Da
 
 	auto &input = data.bind_data->Cast<StartServerFunctionData>();
 
-	GetServer(context).Start(input.host, input.port);
+	GetServer(context).Start(context, input.host, input.port);
 
 	output.SetCardinality(1);
 	output.SetValue(0, 0, true);

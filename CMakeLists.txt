@@ -17,6 +17,7 @@ include_directories(src/include duckdb/third_party/httplib)
 set(EXTENSION_SOURCES
         src/duck_explorer_extension.cpp
         src/gen/files.cpp
+        src/result_serializer.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
