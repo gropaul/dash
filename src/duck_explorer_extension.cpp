@@ -1,47 +1,41 @@
 #define DUCKDB_EXTENSION_MAIN
 
 #include "duck_explorer_extension.hpp"
-#include "duckdb.hpp"
-#include "duckdb/common/exception.hpp"
-#include "duckdb/common/string_util.hpp"
-#include "duckdb/function/scalar_function.hpp"
-#include "duckdb/main/extension_util.hpp"
-#include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
-// OpenSSL linked through vcpkg
-#include <openssl/opensslv.h>
+#include "duckdb.hpp"
+#include "duckdb/main/extension_util.hpp"
+#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
+#include "http_server.hpp"
+#include "table_functions.hpp"
 
 namespace duckdb {
 
-inline void DuckExplorerScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-    auto &name_vector = args.data[0];
-    UnaryExecutor::Execute<string_t, string_t>(
-	    name_vector, result, args.size(),
-	    [&](string_t name) {
-			return StringVector::AddString(result, "DuckExplorer "+name.GetString()+" 🐥");;
-        });
-}
-
-inline void DuckExplorerOpenSSLVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-    auto &name_vector = args.data[0];
-    UnaryExecutor::Execute<string_t, string_t>(
-	    name_vector, result, args.size(),
-	    [&](string_t name) {
-			return StringVector::AddString(result, "DuckExplorer " + name.GetString() +
-                                                     ", my linked OpenSSL version is " +
-                                                     OPENSSL_VERSION_TEXT );;
-        });
-}
-
 static void LoadInternal(DatabaseInstance &instance) {
-    // Register a scalar function
-    auto duck_explorer_scalar_function = ScalarFunction("duck_explorer", {LogicalType::VARCHAR}, LogicalType::VARCHAR, DuckExplorerScalarFun);
-    ExtensionUtil::RegisterFunction(instance, duck_explorer_scalar_function);
+	Connection conn(instance);
+	conn.BeginTransaction();
+	auto &context = *conn.context;
+	auto &catalog = Catalog::GetSystemCatalog(context);
 
-    // Register another scalar function
-    auto duck_explorer_openssl_version_scalar_function = ScalarFunction("duck_explorer_openssl_version", {LogicalType::VARCHAR},
-                                                LogicalType::VARCHAR, DuckExplorerOpenSSLVersionScalarFun);
-    ExtensionUtil::RegisterFunction(instance, duck_explorer_openssl_version_scalar_function);
+	{
+		TableFunction tf(std::string("start_duck_explorer"),
+		                 {
+		                     LogicalType::VARCHAR, // Host
+		                     LogicalType::INTEGER // Port
+		                 },
+		                 StartHttpServer, BindStartHttpServer, RunOnceGlobalTableFunctionState::Init);
+		CreateTableFunctionInfo tf_info(tf);
+		catalog.CreateTableFunction(context, &tf_info);
+	}
+
+	{
+
+		TableFunction tf(std::string("stop_duck_explorer"), {}, StopHttpServer, BindStopHttpServer,
+		                 RunOnceGlobalTableFunctionState::Init);
+		CreateTableFunctionInfo tf_info(tf);
+		catalog.CreateTableFunction(context, &tf_info);
+	}
+
+	conn.Commit();
 }
 
 void DuckExplorerExtension::Load(DuckDB &db) {
@@ -64,8 +58,8 @@ std::string DuckExplorerExtension::Version() const {
 extern "C" {
 
 DUCKDB_EXTENSION_API void duck_explorer_init(duckdb::DatabaseInstance &db) {
-    duckdb::DuckDB db_wrapper(db);
-    db_wrapper.LoadExtension<duckdb::DuckExplorerExtension>();
+	duckdb::DuckDB db_wrapper(db);
+	db_wrapper.LoadExtension<duckdb::DuckExplorerExtension>();
 }
 
 DUCKDB_EXTENSION_API const char *duck_explorer_version() {
