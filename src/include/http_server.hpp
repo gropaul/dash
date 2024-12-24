@@ -19,6 +19,7 @@ public:
 	DuckExplorerHttpServer() {
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Post("/", [this](const Request &req, Response &res) { ExecuteQueryLegacy(req, res); });
+		server.Get("/ping", [](const Request &req, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
 	}
 	~DuckExplorerHttpServer() {
@@ -53,8 +54,7 @@ public:
 
 private:
 	void ExecuteQuery(const Request &req, Response &res) const {
-		const auto execution = ParseQuery(req);
-		execution.Execute(db_instance.lock(), res);
+		ExecutionRequest::ParseQuery(req).Execute(db_instance.lock(), res);
 	}
 
 	void ExecuteQueryLegacy(const Request &req, Response &res) const {
