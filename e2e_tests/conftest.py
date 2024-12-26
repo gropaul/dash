@@ -21,9 +21,8 @@ def http_duck() -> Iterator[Client]:
     )
 
     # Load the extension
-    process.stdin.write("LOAD duck_explorer;\n")
-    cmd = f"CALL start_duck_explorer('{HOST}', {PORT});\n"
-    process.stdin.write(cmd)
+    # process.stdin.write("LOAD duck_explorer;\n")
+    # process.stdin.write(f"CALL start_duck_explorer('{HOST}', {PORT});\n")
 
     client = Client(f"http://{HOST}:{PORT}")
     client.on_ready()

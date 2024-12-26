@@ -58,7 +58,7 @@ private:
 	}
 
 	void ExecuteQueryLegacy(const Request &req, Response &res) const {
-		const ExecutionRequest execution {req.body, ResponseFormat::COMPACT_JSON};
+		const ExecutionRequest execution {req.body, ResponseFormat::COMPACT_JSON, nullptr};
 		execution.Execute(db_instance.lock(), res);
 	}
 
