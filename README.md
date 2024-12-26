@@ -2,21 +2,13 @@
 
 ## Development
 
-### Cloning the Repository
+### Setting up the Repository
 
 Clone the repository and all its submodules
 
 ```bash
 git clone <your-fork-url>
 git submodule update --init --recursive
-```
-
-### Building the local UI
-
-```
-cd explorer-ui
-npm install
-NEXT_PUBLIC_BASE_PATH="" npm run build
 ```
 
 ### Setting up CLion
