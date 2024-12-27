@@ -43,7 +43,7 @@ public:
 
 	void Stop() {
 		if (!started.exchange(false)) {
-			throw ExecutorException("Server not started");
+			return;
 		}
 
 		Printer::Print("Stopping server");
