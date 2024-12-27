@@ -40,9 +40,7 @@ jobs:
         name: Checkout Root repository
         with:
           fetch-depth: 0
-          submodules: false
-      - name: Checkout explorer-ui
-        run: git submodule update --init --recursive explorer-ui
+          submodules: true
       - name: Install package manager
         run: npm install -g pnpm
       - name: Setup Node
