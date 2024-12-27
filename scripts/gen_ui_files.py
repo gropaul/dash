@@ -1,8 +1,8 @@
 import glob
 import os
 
-current_dir = os.path.dirname(os.path.realpath(__file__))
-target_file = os.path.join(current_dir, "src", "gen", "files.cpp")
+root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+target_file = os.path.join(root_dir, "src", "gen", "files.cpp")
 
 CONTENT_TEMPLATE = """
     // Path
@@ -73,7 +73,10 @@ def get_content_type(file: str) -> str:
 
 
 def main():
-    base_path = os.path.join(current_dir, "explorer-ui", "out")
+    base_path = os.path.join(root_dir, "explorer-ui", "out")
+    if not os.path.exists(base_path):
+        raise Exception(f"Path {base_path} does not exist. Build the UI first.")
+
     files = glob.glob(os.path.join(base_path, "**", "*"), recursive=True)
 
     content_list: list[str] = []
