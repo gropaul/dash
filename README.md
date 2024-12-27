@@ -11,6 +11,20 @@ git clone <your-fork-url>
 git submodule update --init --recursive
 ```
 
+**Build the UI:** Change into the _explorer-ui_ directory and build the UI
+
+```bash
+cd explorer-ui
+pnpm install --frozen-lockfile
+NEXT_PUBLIC_API_URL="" pnpm run build
+```
+
+**Generate source files:** Change back to the root directory and generate the source files containing the UI
+
+```bash
+python3 scripts/gen_ui_files.py
+```
+
 ### Setting up CLion
 
 **Opening project:**
