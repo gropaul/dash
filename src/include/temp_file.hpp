@@ -3,14 +3,14 @@
 #include <fstream>
 
 #ifdef _WIN32
-#include <fileapi.h>
+#include <windows.h>
 #endif
 
 namespace duckdb {
 
 class TempFile {
 public:
-	TempFile(const std::string &_name, const std::string &_data): name(_name) {
+	TempFile(const std::string &_name, const std::string &_data) : name(_name) {
 		assigned_path = GetTempDir() + "/" + std::to_string(::rand()) + "_" + name;
 
 		std::ofstream file(assigned_path, std::ios::binary);
@@ -24,7 +24,6 @@ public:
 
 	TempFile(const TempFile &) = delete;
 	TempFile &operator=(const TempFile &) = delete;
-
 
 	~TempFile() {
 		remove(GetPath().c_str());
@@ -49,12 +48,16 @@ public:
 		return temp_path;
 #else
 		const char *val = nullptr;
-		(val = std::getenv("TMPDIR")) || (val = std::getenv("TMP")) || (val = std::getenv("TEMP")) ||
+		// ReSharper disable CppUsingResultOfAssignmentAsCondition
+		(val = std::getenv("TMPDIR")) ||   //
+		    (val = std::getenv("TMP")) ||  //
+		    (val = std::getenv("TEMP")) || //
 		    (val = std::getenv("TEMPDIR"));
+		// ReSharper restore CppUsingResultOfAssignmentAsCondition
 #ifdef __ANDROID__
-		const char *default_tmp = "/data/local/tmp";
+		auto *default_tmp = "/data/local/tmp";
 #else
-		const char *default_tmp = "/tmp";
+		auto default_tmp = "/tmp";
 #endif
 		return val ? val : default_tmp;
 #endif
