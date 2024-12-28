@@ -18,6 +18,7 @@ set(EXTENSION_SOURCES
         src/duck_explorer_extension.cpp
         src/gen/files.cpp
         src/result_serializer.cpp
+        src/temp_file.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
