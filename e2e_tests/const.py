@@ -7,3 +7,4 @@ RELEASE_SHELL = f"{PROJECT_DIR}/build/release/duckdb"
 
 HOST = "localhost"
 PORT = 9999
+API_KEY = "abc123"

@@ -14,9 +14,13 @@ class ResponseFormat(Enum):
 
 
 class Client:
-    def __init__(self, url: str, auth_token: str | None = None):
+    def __init__(self, url: str, api_key: str | None = None):
         self._url = url
-        self._auth_token = auth_token
+        self._api_key = api_key
+
+    def with_key(self, api_key: str | None) -> Client:
+        self._api_key = api_key
+        return self
 
     def execute_query(
         self,
@@ -27,8 +31,8 @@ class Client:
         files = files or []
 
         headers = {}
-        if self._auth_token:
-            headers["X-API-Key"] = self._auth_token
+        if self._api_key:
+            headers["X-API-Key"] = self._api_key
 
         body = {"query": sql, "format": response_format.value}
 

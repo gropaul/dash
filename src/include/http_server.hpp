@@ -3,8 +3,6 @@
 #include "duckdb/main/client_context.hpp"
 #include "files.hpp"
 #include "parse_query.hpp"
-#include "result_serializer_compact_json.hpp"
-#include "yyjson.hpp"
 #include "result.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -19,7 +17,6 @@ class DuckExplorerHttpServer {
 public:
 	DuckExplorerHttpServer() {
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
-		server.Post("/", [this](const Request &req, Response &res) { ExecuteQueryLegacy(req, res); });
 		server.Get("/ping", [](const Request &req, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
 	}
@@ -27,7 +24,7 @@ public:
 		Stop();
 	}
 
-	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string& _api_key) {
+	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string &_api_key) {
 		if (started.exchange(true)) {
 			throw ExecutorException("Server already started");
 		}
@@ -37,27 +34,33 @@ public:
 		db_instance = c.db;
 		api_key = _api_key;
 
-		server_thread = std::thread([&] {
+		server_thread = std::thread([host, port, this] {
 			if (!server.listen(host, port)) {
-				throw ExecutorException("Failed to start HTTP server on " + host + ":" + std::to_string(port));
+				Printer::Print("Failed to start HTTP server on " + host + ":" + std::to_string(port));
+				Stop(false);
 			}
 		});
 	}
 
-	void Stop() {
+	void Stop(const bool join_thread = true) {
 		if (!started.exchange(false)) {
 			return;
 		}
 
 		Printer::Print("Stopping server");
 		server.stop();
-		server_thread.join();
 		db_instance.reset();
+		if (join_thread) {
+			server_thread.join();
+		}
 	}
 
 private:
 	void ExecuteQuery(const Request &req, Response &res) const {
-		ExecutionRequest::FromRequest(req, api_key);
+		auto execution_request = ExecutionRequest::FromRequest(req, api_key);
+		RETURN_IF_ERROR_CB(execution_request, ([&res](const ErrorData &error) { RespondError(error, res); }))
+		auto execution_error = execution_request->Execute(db_instance.lock(), res);
+		RETURN_IF_ERROR_CB(execution_error, ([&res](const ErrorData &error) { RespondError(error, res); }));
 	}
 
 	void ServeUi(const Request &req, Response &res) const {
@@ -82,7 +85,7 @@ private:
 
 	std::atomic_bool started {false};
 	Server server;
-	std::string api_key{};
+	std::string api_key {};
 	std::thread server_thread;
 	weak_ptr<DatabaseInstance> db_instance;
 };

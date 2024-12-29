@@ -4,7 +4,7 @@ from typing import Iterator
 import pytest
 
 from .client import Client
-from .const import DEBUG_SHELL, HOST, PORT
+from .const import DEBUG_SHELL, HOST, PORT, API_KEY
 
 
 @pytest.fixture
@@ -21,10 +21,34 @@ def http_duck() -> Iterator[Client]:
     )
 
     # Load the extension
-    # process.stdin.write("LOAD duck_explorer;\n")
-    # process.stdin.write(f"CALL start_duck_explorer('{HOST}', {PORT});\n")
+    process.stdin.write("LOAD duck_explorer;\n")
+    process.stdin.write(f"CALL start_duck_explorer('{HOST}', {PORT});\n")
 
     client = Client(f"http://{HOST}:{PORT}")
+    client.on_ready()
+    yield client
+
+    process.kill()
+
+
+@pytest.fixture
+def http_duck_auth() -> Iterator[Client]:
+    process = subprocess.Popen(
+        [
+            DEBUG_SHELL,
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=2 ^ 16,
+    )
+
+    # Load the extension
+    process.stdin.write("LOAD duck_explorer;\n")
+    process.stdin.write(f"CALL start_duck_explorer('{HOST}', {PORT}, api_key='{API_KEY}');\n")
+
+    client = Client(f"http://{HOST}:{PORT}", api_key=API_KEY)
     client.on_ready()
     yield client
 

@@ -20,9 +20,10 @@ static void LoadInternal(DatabaseInstance &instance) {
 		TableFunction tf(std::string("start_duck_explorer"),
 		                 {
 		                     LogicalType::VARCHAR, // Host
-		                     LogicalType::INTEGER // Port
+		                     LogicalType::INTEGER  // Port
 		                 },
 		                 StartHttpServer, BindStartHttpServer, RunOnceGlobalTableFunctionState::Init);
+		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
 		CreateTableFunctionInfo tf_info(tf);
 		catalog.CreateTableFunction(context, &tf_info);
 	}
