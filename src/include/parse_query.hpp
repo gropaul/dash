@@ -23,21 +23,17 @@ struct ExecutionRequest {
 	const std::string query {};
 	const ResponseFormat format = ResponseFormat::INVALID;
 	optional_ptr<const MultipartFormDataMap> files;
-	ErrorData parsing_error {};
 
-	ExecutionRequest(const std::string &query, const ResponseFormat format, optional_ptr<const MultipartFormDataMap> files)
+	ExecutionRequest(const std::string &query, const ResponseFormat format,
+	                 optional_ptr<const MultipartFormDataMap> files)
 	    : query(query), format(format), files(files) {
 	}
 
-	explicit ExecutionRequest(ErrorData error) : parsing_error(std::move(error)) {
+	explicit ExecutionRequest() {
 	}
 
-	void Execute(const shared_ptr<DatabaseInstance> &db, Response &res) const {
+	ErrorData Execute(const shared_ptr<DatabaseInstance> &db, Response &res) const {
 		D_ASSERT(db);
-
-		if (parsing_error.HasError()) {
-			return RespondError(parsing_error, res);
-		}
 
 		D_ASSERT(format != ResponseFormat::INVALID);
 		Connection conn(*db);
@@ -55,73 +51,105 @@ struct ExecutionRequest {
 		}
 
 		for (const auto &file : temp_files) {
-			auto create_file_query = "CREATE TEMP TABLE " + KeywordHelper::WriteQuoted(file->GetName()) +
-						 " AS FROM " + KeywordHelper::WriteQuoted(file->GetPath());
+			auto create_file_query = "CREATE TEMP TABLE " + KeywordHelper::WriteQuoted(file->GetName()) + " AS FROM " +
+			                         KeywordHelper::WriteQuoted(file->GetPath());
 			auto result = conn.Query(create_file_query);
 			if (result->HasError()) {
-				auto error = result->GetErrorObject();
-				return RespondError(error, res);
+				return result->GetErrorObject();
 			}
 		}
 
 		auto result = conn.Query(query);
 		if (result->HasError()) {
-			auto error = result->GetErrorObject();
-			return RespondError(error, res);
+			return result->GetErrorObject();
 		}
 
 		ResultSerializerCompactJson serializer;
 		const auto json = serializer.Serialize(*result);
 		res.set_content(json, "application/json");
+
+		return {};
 	}
 
-	static ExecutionRequest ParseQuery(const Request &req) {
-		std::string request_str;
+
+	static std::tuple<ExecutionRequest, ErrorData> FromRequest(const Request &req, const std::string &api_key) {
+		auto error = CorrectApiKey(api_key, req);
+		if (error.HasError()) {
+			return {ExecutionRequest(), error};
+		}
+
+		auto [request_str, _] = GetRequestBody(req);
+
+		return ParseQuery(req, request_str);
+	}
+
+private:
+
+	static ErrorData CorrectApiKey(const std::string &api_key, const Request &req) {
+		if (api_key.empty()) {
+			return ErrorData();
+		}
+
+		const auto &api_key_header = req.get_header_value("X-Api-Key");
+		if (api_key_header.empty()) {
+			return ErrorData {ExceptionType::HTTP, "Missing 'X-Api-Key' header"};
+		}
+
+		if (api_key_header != api_key) {
+			return ErrorData {ExceptionType::HTTP, "Invalid API key"};
+		}
+
+		return ErrorData();
+	}
+
+	static std::tuple<std::string, ErrorData> GetRequestBody(const Request &req) {
 		if (req.is_multipart_form_data()) {
 			if (!req.has_file("query_json")) {
-				return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Missing 'query_json' file"}};
+				return {"", ErrorData {ExceptionType::HTTP, "Missing 'query_json' file"}};
 			}
 
 			// Make sure that the files does not have multiple values
 			for (auto it = req.files.begin(); it != req.files.end();) {
 				auto count = req.files.count(it->first);
 				if (count > 1) {
-					return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Multiple files with name: " + it->first}};
+					return {"", ErrorData {ExceptionType::HTTP, "Multiple files with name: " + it->first}};
 				}
 				std::advance(it, count);
 			}
 
-			request_str = req.get_file_value("query_json").content;
+			return {req.get_file_value("query_json").content, {}};
 		} else {
-			request_str = req.body;
+			return {req.body, {}};
 		}
+	}
 
+	static std::tuple<ExecutionRequest, ErrorData> ParseQuery(const Request &req, const std::string &request_str) {
 		constexpr yyjson_read_flag flags = YYJSON_READ_ALLOW_TRAILING_COMMAS | YYJSON_READ_ALLOW_INF_AND_NAN;
 		yyjson_doc *doc = yyjson_read(request_str.c_str(), request_str.size(), flags);
 		if (!doc) {
-			return ExecutionRequest(ErrorData {ExceptionType::HTTP, "Could not parse JSON body"});
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Could not parse JSON body"}};
 		}
 
 		yyjson_val *obj = yyjson_doc_get_root(doc);
 		AutoCleaner cleaner([&] { yyjson_doc_free(doc); });
 
 		if (!obj || yyjson_get_type(obj) != YYJSON_TYPE_OBJ) {
-			return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Expected JSON object as root"}};
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Expected JSON object as root"}};
 		}
 
 		yyjson_val *query_obj = yyjson_obj_get(obj, "query");
 		if (!query_obj || yyjson_get_type(query_obj) != YYJSON_TYPE_STR) {
-			return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Expected 'query' field as string"}};
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Expected 'query' field as string"}};
 		}
 
 		std::string query = yyjson_get_str(query_obj);
 		if (query.empty()) {
-			return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Query is empty"}};
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Query is empty"}};
 		}
 
 		yyjson_val *format_obj = yyjson_obj_get(obj, "format");
 		if (!format_obj || yyjson_get_type(format_obj) != YYJSON_TYPE_STR) {
-			return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Expected 'format' field as string"}};
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Expected 'format' field as string"}};
 		}
 
 		ResponseFormat format = ResponseFormat::INVALID;
@@ -129,18 +157,12 @@ struct ExecutionRequest {
 		if (format_str == "compact_json") {
 			format = ResponseFormat::COMPACT_JSON;
 		} else {
-			return ExecutionRequest {ErrorData {ExceptionType::HTTP, "Unknown format: " + format_str}};
+			return {ExecutionRequest(), ErrorData {ExceptionType::HTTP, "Unknown format: " + format_str}};
 		}
 
-		return ExecutionRequest {query, format, req.files};
+		return {ExecutionRequest(query, format, req.files), ErrorData()};
 	}
 
-private:
-	static void RespondError(ErrorData error, Response &res) {
-		error.ConvertErrorToJSON();
-		res.status = 400;
-		res.set_content(error.Message(), "application/json");
-	}
 };
 
 } // namespace duckdb

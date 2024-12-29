@@ -5,6 +5,7 @@
 #include "parse_query.hpp"
 #include "result_serializer_compact_json.hpp"
 #include "yyjson.hpp"
+#include "result.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
@@ -26,7 +27,7 @@ public:
 		Stop();
 	}
 
-	void Start(ClientContext &c, const std::string &host, const int32_t port) {
+	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string& _api_key) {
 		if (started.exchange(true)) {
 			throw ExecutorException("Server already started");
 		}
@@ -34,6 +35,8 @@ public:
 		Printer::Print("Starting server on " + host + ":" + std::to_string(port));
 
 		db_instance = c.db;
+		api_key = _api_key;
+
 		server_thread = std::thread([&] {
 			if (!server.listen(host, port)) {
 				throw ExecutorException("Failed to start HTTP server on " + host + ":" + std::to_string(port));
@@ -54,12 +57,7 @@ public:
 
 private:
 	void ExecuteQuery(const Request &req, Response &res) const {
-		ExecutionRequest::ParseQuery(req).Execute(db_instance.lock(), res);
-	}
-
-	void ExecuteQueryLegacy(const Request &req, Response &res) const {
-		const ExecutionRequest execution {req.body, ResponseFormat::COMPACT_JSON, nullptr};
-		execution.Execute(db_instance.lock(), res);
+		ExecutionRequest::FromRequest(req, api_key);
 	}
 
 	void ServeUi(const Request &req, Response &res) const {
@@ -76,8 +74,15 @@ private:
 		res.set_content(reinterpret_cast<char const *>(data), size, file->content_type);
 	}
 
+	static void RespondError(ErrorData error, Response &res) {
+		error.ConvertErrorToJSON();
+		res.status = 400;
+		res.set_content(error.Message(), "application/json");
+	}
+
 	std::atomic_bool started {false};
 	Server server;
+	std::string api_key{};
 	std::thread server_thread;
 	weak_ptr<DatabaseInstance> db_instance;
 };
