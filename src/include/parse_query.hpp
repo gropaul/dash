@@ -23,14 +23,10 @@ enum class ResponseFormat {
 struct ExecutionRequest {
 	const std::string query {};
 	const ResponseFormat format = ResponseFormat::INVALID;
-	optional_ptr<const MultipartFormDataMap> files;
+	const MultipartFormDataMap &files;
 
-	ExecutionRequest(const std::string &query, const ResponseFormat format,
-	                 optional_ptr<const MultipartFormDataMap> files)
+	ExecutionRequest(const std::string &query, const ResponseFormat format, const MultipartFormDataMap &files)
 	    : query(query), format(format), files(files) {
-	}
-
-	explicit ExecutionRequest() {
 	}
 
 	Result<std::nullptr_t> Execute(const shared_ptr<DatabaseInstance> &db, Response &res) const {
@@ -41,7 +37,7 @@ struct ExecutionRequest {
 		std::vector<unique_ptr<TempFile>> temp_files;
 		// Create a temporary table for each file by creating the files in the temporary directory, then creating a
 		// temporary table for each file
-		for (const auto &file : *files) {
+		for (const auto &file : files) {
 			const auto &file_name = !file.second.filename.empty() ? file.second.filename : file.second.name;
 			if (file_name == "query_json") {
 				continue;
@@ -68,11 +64,11 @@ struct ExecutionRequest {
 		const auto json = serializer.Serialize(*result);
 		res.set_content(json, "application/json");
 
-		return Result<std::nullptr_t>(nullptr);
+		return nullptr;
 	}
 
 	static Result<ExecutionRequest> FromRequest(const Request &req, const std::string &api_key) {
-		RETURN_IF_ERROR(CorrectApiKey(api_key, req));
+		RETURN_IF_ERROR(HasCorrectApiKey(api_key, req));
 
 		auto body = GetRequestBody(req);
 		RETURN_IF_ERROR(body);
@@ -81,9 +77,9 @@ struct ExecutionRequest {
 	}
 
 private:
-	static Result<std::nullptr_t> CorrectApiKey(const std::string &api_key, const Request &req) {
+	static Result<std::nullptr_t> HasCorrectApiKey(const std::string &api_key, const Request &req) {
 		if (api_key.empty()) {
-			return Result<std::nullptr_t>(nullptr);
+			return nullptr;
 		}
 
 		const auto &api_key_header = req.get_header_value("X-Api-Key");
@@ -95,10 +91,10 @@ private:
 			return ErrorData {ExceptionType::HTTP, "Invalid API key"};
 		}
 
-		return Result<std::nullptr_t>(nullptr);
+		return nullptr;
 	}
 
-	static Result<std::pair<std::string, MultipartFormDataMap>> GetRequestBody(const Request &req) {
+	static Result<std::pair<std::string, const MultipartFormDataMap &>> GetRequestBody(const Request &req) {
 		if (req.is_multipart_form_data()) {
 			if (!req.has_file("query_json")) {
 				return ErrorData {ExceptionType::HTTP, "Missing 'query_json' file"};
@@ -113,10 +109,10 @@ private:
 				std::advance(it, count);
 			}
 
-			return Result<std::pair<std::string, MultipartFormDataMap>>(
+			return Result<std::pair<std::string, const MultipartFormDataMap &>>(
 			    {req.get_file_value("query_json").content, req.files});
 		} else {
-			return Result<std::pair<std::string, MultipartFormDataMap>>({req.body, {}});
+			return Result<std::pair<std::string, const MultipartFormDataMap &>>({req.body, req.files});
 		}
 	}
 
@@ -157,7 +153,7 @@ private:
 			return ErrorData {ExceptionType::HTTP, "Unknown format: " + format_str};
 		}
 
-		return Result<ExecutionRequest>(ExecutionRequest(query, format, files));
+		return ExecutionRequest(query, format, files);
 	}
 };
 
