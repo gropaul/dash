@@ -52,6 +52,8 @@ public:
 		db_instance.reset();
 		if (join_thread) {
 			server_thread.join();
+		} else {
+			server_thread.detach();
 		}
 	}
 
