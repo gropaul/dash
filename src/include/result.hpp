@@ -19,7 +19,9 @@ namespace duckdb {
 template <typename T>
 class Result {
 public:
-	Result(T &&_value) : value(make_uniq<T>(std::forward<T>(_value))) {
+	template <typename... Args, typename std::enable_if<
+	                                !std::is_same<typename std::decay<Args>::type..., ErrorData>::value, int>::type = 0>
+	Result(Args &&...args) : value(make_uniq<T>(std::forward<Args>(args)...)) {
 	}
 
 	Result(ErrorData &&_error) : error(std::forward<ErrorData>(_error)) {
@@ -44,7 +46,6 @@ public:
 		return value;
 	}
 
-	// Implement -> operator to allow accessing results like pointers
 	T *operator->() {
 		D_ASSERT(!HasError());
 		return value.get();

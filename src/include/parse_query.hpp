@@ -109,10 +109,9 @@ private:
 				std::advance(it, count);
 			}
 
-			return Result<std::pair<std::string, const MultipartFormDataMap &>>(
-			    {req.get_file_value("query_json").content, req.files});
+			return std::make_pair(req.get_file_value("query_json").content, req.files);
 		} else {
-			return Result<std::pair<std::string, const MultipartFormDataMap &>>({req.body, req.files});
+			return std::make_pair(req.body, req.files);
 		}
 	}
 
