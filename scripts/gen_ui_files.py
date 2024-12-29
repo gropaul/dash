@@ -5,13 +5,16 @@ root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 target_file = os.path.join(root_dir, "src", "gen", "files.cpp")
 
 CONTENT_TEMPLATE = """
-    // Path
-    {R"__(%path%)__",
-     {
-         // Content
-         %content%,    //
-         R"__(%content_type%)__", //
-     }}, //
+#pragma once
+#include "files.hpp"
+namespace duckdb {
+File %var_name% = {
+     // Content
+     %content%,    //
+     R"__(%content_type%)__", //
+     R"__(%path%)__", //
+};
+}
 """
 
 FILE_TEMPLATE = """
@@ -20,10 +23,12 @@ FILE_TEMPLATE = """
 #include "duckdb/common/optional_ptr.hpp"
 #include "duckdb/common/string_util.hpp"
 
+%include%
+
 #include <map>
 
 namespace duckdb { 
-std::map<Path, File> files = {
+std::vector<File> files = {
 	%content%
 };
 
@@ -36,12 +41,12 @@ optional_ptr<File> GetFile(Path path) {
 	path = "/" + path + "/";
 	path = StringUtil::Replace(path, "//", "/");
 
-	const auto entry = files.find(path);
+	auto entry = std::find_if(files.begin(), files.end(), [&path](File &x) { return x.path == path; });
 	if (entry == files.end()) {
 		return nullptr;
 	}
 
-	return entry->second;
+	return *entry;
 }
 
 }
@@ -74,6 +79,7 @@ def get_content_type(file: str) -> str:
 
 def main():
     base_path = os.path.join(root_dir, "explorer-ui", "out")
+    target_dir = os.path.dirname(target_file)
     if not os.path.exists(base_path):
         raise Exception(f"Path {base_path} does not exist. Build the UI first.")
 
@@ -89,7 +95,7 @@ def main():
             "rb",
         ).read()
 
-        # Goal: {0x33, 0x55}shel
+        # Goal: {0x33, 0x55}
         transformed_content = "{"
         for byte in content:
             transformed_content += f"0x{byte:02x}, "
@@ -97,16 +103,26 @@ def main():
 
         path = normalize_path(file.replace(base_path, ""))
 
+        path_as_name = path.replace("/", "_").replace(".", "_").replace("-", "_")
+        final_path = target_dir + "/" + path_as_name + ".hpp"
+
         templated = (
             CONTENT_TEMPLATE.replace("%path%", path)
             .replace("%content%", transformed_content)
             .replace("%content_type%", get_content_type(file))
+            .replace("%var_name%", path_as_name.upper())
         )
-        content_list.append(templated)
 
-    content = FILE_TEMPLATE.replace("%content%", "".join(content_list)).lstrip()
+        with open(final_path, "w") as f:
+            f.write(templated)
+        content_list.append(path_as_name)
 
-    target_dir = os.path.dirname(target_file)
+    content = (
+        FILE_TEMPLATE.replace("%content%", ",".join(content_list).upper())
+        .lstrip()
+        .replace("%include%", "\n".join([f'#include "{f}.hpp"' for f in content_list]))
+    )
+
     os.makedirs(target_dir, exist_ok=True)
     with open(target_file, "w") as f:
         f.write(content)

@@ -13,6 +13,7 @@ typedef unsigned char Byte;
 struct File {
 	std::vector<Byte> content;
 	std::string content_type;
+	std::string path;
 };
 
 optional_ptr<File> GetFile(Path path);
