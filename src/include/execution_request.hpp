@@ -51,13 +51,13 @@ struct ExecutionRequest {
 			                         KeywordHelper::WriteQuoted(file->GetPath());
 			auto result = conn.Query(create_file_query);
 			if (result->HasError()) {
-				return result->GetErrorObject();
+				return {InternalServerError_500, result->GetErrorObject()};
 			}
 		}
 
 		auto result = conn.Query(query);
 		if (result->HasError()) {
-			return result->GetErrorObject();
+			return {BadRequest_400, result->GetErrorObject()};
 		}
 
 		ResultSerializerCompactJson serializer;
@@ -84,11 +84,11 @@ private:
 
 		const auto &api_key_header = req.get_header_value("X-Api-Key");
 		if (api_key_header.empty()) {
-			return ErrorData {ExceptionType::HTTP, "Missing 'X-Api-Key' header"};
+			return HttpErrorData {Unauthorized_401, "Missing 'X-Api-Key' header"};
 		}
 
 		if (api_key_header != api_key) {
-			return ErrorData {ExceptionType::HTTP, "Invalid API key"};
+			return HttpErrorData {Unauthorized_401, "Invalid API key"};
 		}
 
 		return nullptr;
@@ -97,14 +97,14 @@ private:
 	static Result<std::pair<std::string, const MultipartFormDataMap &>> GetRequestBody(const Request &req) {
 		if (req.is_multipart_form_data()) {
 			if (!req.has_file("query_json")) {
-				return ErrorData {ExceptionType::HTTP, "Missing 'query_json' file"};
+				return HttpErrorData {BadRequest_400, "Missing 'query_json' file"};
 			}
 
 			// Make sure that the files does not have multiple values
 			for (auto it = req.files.begin(); it != req.files.end();) {
 				auto count = req.files.count(it->first);
 				if (count > 1) {
-					return ErrorData {ExceptionType::HTTP, "Multiple files with name: " + it->first};
+					return HttpErrorData {BadRequest_400, "Multiple files with name: " + it->first};
 				}
 				std::advance(it, count);
 			}
@@ -119,29 +119,29 @@ private:
 		constexpr yyjson_read_flag flags = YYJSON_READ_ALLOW_TRAILING_COMMAS | YYJSON_READ_ALLOW_INF_AND_NAN;
 		yyjson_doc *doc = yyjson_read(request_str.c_str(), request_str.size(), flags);
 		if (!doc) {
-			return ErrorData {ExceptionType::HTTP, "Could not parse JSON body"};
+			return HttpErrorData {BadRequest_400, "Could not parse JSON body"};
 		}
 
 		yyjson_val *obj = yyjson_doc_get_root(doc);
 		AutoCleaner cleaner([&] { yyjson_doc_free(doc); });
 
 		if (!obj || yyjson_get_type(obj) != YYJSON_TYPE_OBJ) {
-			return ErrorData {ExceptionType::HTTP, "Expected JSON object as root"};
+			return HttpErrorData {BadRequest_400, "Expected JSON object as root"};
 		}
 
 		yyjson_val *query_obj = yyjson_obj_get(obj, "query");
 		if (!query_obj || yyjson_get_type(query_obj) != YYJSON_TYPE_STR) {
-			return ErrorData {ExceptionType::HTTP, "Expected 'query' field as string"};
+			return HttpErrorData {BadRequest_400, "Expected 'query' field as string"};
 		}
 
 		std::string query = yyjson_get_str(query_obj);
 		if (query.empty()) {
-			return ErrorData {ExceptionType::HTTP, "Query is empty"};
+			return HttpErrorData {BadRequest_400, "Query is empty"};
 		}
 
 		yyjson_val *format_obj = yyjson_obj_get(obj, "format");
 		if (!format_obj || yyjson_get_type(format_obj) != YYJSON_TYPE_STR) {
-			return ErrorData {ExceptionType::HTTP, "Expected 'format' field as string"};
+			return HttpErrorData {BadRequest_400, "Expected 'format' field as string"};
 		}
 
 		ResponseFormat format = ResponseFormat::INVALID;
@@ -149,7 +149,7 @@ private:
 		if (StringUtil::Lower(format_str) == "compact_json") {
 			format = ResponseFormat::COMPACT_JSON;
 		} else {
-			return ErrorData {ExceptionType::HTTP, "Unknown format: " + format_str};
+			return HttpErrorData {BadRequest_400, "Unknown format: " + format_str};
 		}
 
 		return ExecutionRequest(query, format, files);

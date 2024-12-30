@@ -2,8 +2,9 @@
 
 #include "duckdb/main/client_context.hpp"
 #include "files.hpp"
-#include "parse_query.hpp"
+#include "execution_request.hpp"
 #include "result.hpp"
+#include "http_error_data.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
@@ -64,9 +65,9 @@ private:
 	void ExecuteQuery(const Request &req, Response &res) const {
 		AddCorsHeaders(res);
 		auto execution_request = ExecutionRequest::FromRequest(req, api_key);
-		RETURN_IF_ERROR_CB(execution_request, ([&res](const ErrorData &error) { RespondError(error, res); }))
+		RETURN_IF_ERROR_CB(execution_request, ([&res](const HttpErrorData &error) { RespondError(error, res); }))
 		auto execution_error = execution_request->Execute(db_instance.lock(), res);
-		RETURN_IF_ERROR_CB(execution_error, ([&res](const ErrorData &error) { RespondError(error, res); }));
+		RETURN_IF_ERROR_CB(execution_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
 	}
 
 	void ServeUi(const Request &req, Response &res) const {
@@ -83,9 +84,9 @@ private:
 		res.set_content(reinterpret_cast<char const *>(data), size, file->content_type);
 	}
 
-	static void RespondError(ErrorData error, Response &res) {
+	static void RespondError(HttpErrorData error, Response &res) {
 		error.ConvertErrorToJSON();
-		res.status = 400;
+		res.status = error.status_code;
 		res.set_content(error.Message(), "application/json");
 	}
 
