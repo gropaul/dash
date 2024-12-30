@@ -113,6 +113,9 @@ def main():
             .replace("%var_name%", path_as_name.upper())
         )
 
+        # create path on the way to the file
+        os.makedirs(os.path.dirname(final_path), exist_ok=True)
+
         with open(final_path, "w") as f:
             f.write(templated)
         content_list.append(path_as_name)
