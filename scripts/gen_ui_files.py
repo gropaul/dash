@@ -1,5 +1,6 @@
 import glob
 import os
+import shutil
 
 root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 target_file = os.path.join(root_dir, "src", "gen", "files.cpp")
@@ -32,7 +33,7 @@ std::vector<File> files = {
 	%content%
 };
 
-optional_ptr<File> GetFile(Path path) {
+optional_ptr<File> GetFile(Path path, const bool try_resolve_404) {
 	if (path.empty() || path == "/") {
 		path = "index.html";
 	}
@@ -41,12 +42,17 @@ optional_ptr<File> GetFile(Path path) {
 	path = "/" + path + "/";
 	path = StringUtil::Replace(path, "//", "/");
 
-	auto entry = std::find_if(files.begin(), files.end(), [&path](File &x) { return x.path == path; });
-	if (entry == files.end()) {
-		return nullptr;
+	for (auto &file : files) {
+		if (file.path == path) {
+			return file;
+		}
 	}
 
-	return *entry;
+	if (try_resolve_404) {
+		GetFile("/404.html/", false);
+	}
+
+	return nullptr;
 }
 
 }
@@ -80,7 +86,9 @@ def get_content_type(file: str) -> str:
 def main():
     base_path = os.path.join(root_dir, "explorer-ui", "out")
     target_dir = os.path.dirname(target_file)
-    os.makedirs(target_dir, exist_ok=True)
+    if os.path.exists(target_dir):
+        shutil.rmtree(target_dir)
+    os.makedirs(target_dir)
 
     if not os.path.exists(base_path):
         raise Exception(f"Path {base_path} does not exist. Build the UI first.")
