@@ -16,6 +16,6 @@ struct File {
 	std::string path;
 };
 
-optional_ptr<File> GetFile(Path path);
+optional_ptr<File> GetFile(Path path, bool try_resolve_404 = true);
 
 } // namespace duckdb
