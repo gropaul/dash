@@ -146,7 +146,7 @@ private:
 
 		ResponseFormat format = ResponseFormat::INVALID;
 		const std::string format_str = yyjson_get_str(format_obj);
-		if (format_str == "compact_json") {
+		if (StringUtil::Lower(format_str) == "compact_json") {
 			format = ResponseFormat::COMPACT_JSON;
 		} else {
 			return ErrorData {ExceptionType::HTTP, "Unknown format: " + format_str};

@@ -19,6 +19,13 @@ public:
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Get("/ping", [](const Request &req, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
+		server.Options(".*", [](const Request&, Response &res) {
+			res.set_header("Access-Control-Allow-Origin", "*");
+			res.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+			res.set_header("Access-Control-Allow-Headers", "X-Api-Key, Content-Type");
+			res.set_header("Access-Control-Allow-Credentials", "true");
+			res.status = 200;
+		});
 	}
 	~DuckExplorerHttpServer() {
 		Stop();
