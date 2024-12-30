@@ -98,6 +98,7 @@ private:
 		res.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
 		res.set_header("Access-Control-Allow-Headers", "X-Api-Key, Content-Type");
 		res.set_header("Access-Control-Allow-Credentials", "true");
+		res.set_header("Access-Control-Max-Age", "86400");
 	}
 
 	std::atomic_bool started {false};
