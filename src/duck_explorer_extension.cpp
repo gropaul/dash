@@ -13,6 +13,7 @@ namespace duckdb {
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection conn(instance);
 	conn.Query("INSTALL httpfs; LOAD httpfs;");
+	conn.Query("INSTALL json; LOAD json;");
 	conn.Query("INSTALL hostfs FROM community; LOAD hostfs;");
 	conn.BeginTransaction();
 	auto &context = *conn.context;
