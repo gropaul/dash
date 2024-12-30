@@ -14,9 +14,13 @@ class ResponseFormat(Enum):
 
 
 class Client:
-    def __init__(self, url: str, auth_token: str | None = None):
+    def __init__(self, url: str, api_key: str | None = None):
         self._url = url
-        self._auth_token = auth_token
+        self._api_key = api_key
+
+    def with_key(self, api_key: str | None) -> Client:
+        self._api_key = api_key
+        return self
 
     def execute_query(
         self,
@@ -24,11 +28,19 @@ class Client:
         response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
         files: list[str | Path] | None = None,
     ) -> dict:
+        return self.execute_query_raw(sql=sql, response_format=response_format, files=files).json()
+
+    def execute_query_raw(
+        self,
+        sql: str,
+        response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
+        files: list[str | Path] | None = None,
+    ) -> httpx.Response:
         files = files or []
 
         headers = {}
-        if self._auth_token:
-            headers["X-API-Key"] = self._auth_token
+        if self._api_key:
+            headers["X-API-Key"] = self._api_key
 
         body = {"query": sql, "format": response_format.value}
 
@@ -41,9 +53,8 @@ class Client:
 
         with httpx.Client(timeout=120) as client:
             response = client.post(self._url + "/query", headers=headers, json=body, files=transformed_files)
-            if not response.is_success:
-                raise Exception(response.text)
-            return response.json()
+            response.raise_for_status()
+            return response
 
     def ping(self, timeout: int | None = None) -> None:
         with httpx.Client(timeout=timeout) as client:

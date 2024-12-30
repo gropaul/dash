@@ -228,6 +228,7 @@ ALL_TYPES_COMPACT = {
             None,
         ],
     ],
-    "rows": 3,
-    "statistics": {},
+    "statistics": {
+        "rows": 3,
+    },
 }

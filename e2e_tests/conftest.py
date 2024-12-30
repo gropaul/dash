@@ -4,11 +4,10 @@ from typing import Iterator
 import pytest
 
 from .client import Client
-from .const import DEBUG_SHELL, HOST, PORT
+from .const import DEBUG_SHELL, HOST, PORT, API_KEY
 
 
-@pytest.fixture
-def http_duck() -> Iterator[Client]:
+def _start_server(start_cmd: str, client: Client) -> Iterator[Client]:
     process = subprocess.Popen(
         [
             DEBUG_SHELL,
@@ -21,11 +20,32 @@ def http_duck() -> Iterator[Client]:
     )
 
     # Load the extension
-    # process.stdin.write("LOAD duck_explorer;\n")
-    # process.stdin.write(f"CALL start_duck_explorer('{HOST}', {PORT});\n")
+    process.stdin.write("LOAD duck_explorer;\n")
+    process.stdin.write(start_cmd)
 
-    client = Client(f"http://{HOST}:{PORT}")
     client.on_ready()
     yield client
 
     process.kill()
+
+
+@pytest.fixture
+def http_duck() -> Iterator[Client]:
+    for client in _start_server(f"CALL start_duck_explorer('{HOST}', {PORT});\n", Client(f"http://{HOST}:{PORT}")):
+        yield client
+
+
+@pytest.fixture
+def cors_duck() -> Iterator[Client]:
+    for client in _start_server(
+        f"CALL start_duck_explorer('{HOST}', {PORT}, enable_cors=true);\n", Client(f"http://{HOST}:{PORT}")
+    ):
+        yield client
+
+
+@pytest.fixture
+def http_duck_auth() -> Iterator[Client]:
+    for client in _start_server(
+        f"CALL start_duck_explorer('{HOST}', {PORT}, api_key='{API_KEY}');\n", Client(f"http://{HOST}:{PORT}", API_KEY)
+    ):
+        yield client

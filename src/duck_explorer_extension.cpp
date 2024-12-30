@@ -12,6 +12,9 @@ namespace duckdb {
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection conn(instance);
+	conn.Query("INSTALL httpfs; LOAD httpfs;");
+	conn.Query("INSTALL json; LOAD json;");
+	conn.Query("INSTALL hostfs FROM community; LOAD hostfs;");
 	conn.BeginTransaction();
 	auto &context = *conn.context;
 	auto &catalog = Catalog::GetSystemCatalog(context);
@@ -20,9 +23,11 @@ static void LoadInternal(DatabaseInstance &instance) {
 		TableFunction tf(std::string("start_duck_explorer"),
 		                 {
 		                     LogicalType::VARCHAR, // Host
-		                     LogicalType::INTEGER // Port
+		                     LogicalType::INTEGER  // Port
 		                 },
 		                 StartHttpServer, BindStartHttpServer, RunOnceGlobalTableFunctionState::Init);
+		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
+		tf.named_parameters["enable_cors"] = LogicalType::BOOLEAN;
 		CreateTableFunctionInfo tf_info(tf);
 		catalog.CreateTableFunction(context, &tf_info);
 	}

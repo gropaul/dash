@@ -1,5 +1,6 @@
-from .client import Client
-from .const import PROJECT_DIR
+from e2e_tests.client import Client
+
+from e2e_tests.const import PROJECT_DIR
 
 
 def test_uploading_files(http_duck: Client):
@@ -7,4 +8,4 @@ def test_uploading_files(http_duck: Client):
 
     res = http_duck.execute_query("FROM 'range.parquet'", files=[parquet])
 
-    assert res["rows"] == 42
+    assert res["statistics"]["rows"] == 42

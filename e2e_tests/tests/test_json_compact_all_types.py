@@ -1,5 +1,5 @@
-from .client import Client, ResponseFormat
-from .responses.all_types_compact import ALL_TYPES_COMPACT
+from e2e_tests.client import Client, ResponseFormat
+from e2e_tests.responses.all_types_compact import ALL_TYPES_COMPACT
 
 
 def test_json_compact_all_types(http_duck: Client):

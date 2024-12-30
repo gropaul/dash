@@ -80,6 +80,8 @@ def get_content_type(file: str) -> str:
 def main():
     base_path = os.path.join(root_dir, "explorer-ui", "out")
     target_dir = os.path.dirname(target_file)
+    os.makedirs(target_dir, exist_ok=True)
+
     if not os.path.exists(base_path):
         raise Exception(f"Path {base_path} does not exist. Build the UI first.")
 
@@ -126,7 +128,6 @@ def main():
         .replace("%include%", "\n".join([f'#include "{f}.hpp"' for f in content_list]))
     )
 
-    os.makedirs(target_dir, exist_ok=True)
     with open(target_file, "w") as f:
         f.write(content)
 
