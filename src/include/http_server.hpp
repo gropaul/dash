@@ -17,21 +17,16 @@ class DuckExplorerHttpServer {
 public:
 	DuckExplorerHttpServer() {
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
-		server.Get("/ping", [](const Request &req, Response &res) { res.body = "pong"; });
+		server.Get("/ping", [](const Request &, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
-		server.Options(".*", [](const Request&, Response &res) {
-			res.set_header("Access-Control-Allow-Origin", "*");
-			res.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-			res.set_header("Access-Control-Allow-Headers", "X-Api-Key, Content-Type");
-			res.set_header("Access-Control-Allow-Credentials", "true");
-			res.status = 200;
-		});
+		server.Options(".*", [this](const Request &, Response &res) { AddCorsHeaders(res); });
 	}
 	~DuckExplorerHttpServer() {
 		Stop();
 	}
 
-	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string &_api_key) {
+	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string &_api_key,
+	           const bool _enable_cors) {
 		if (started.exchange(true)) {
 			throw ExecutorException("Server already started");
 		}
@@ -40,6 +35,7 @@ public:
 
 		db_instance = c.db;
 		api_key = _api_key;
+		enable_cors = _enable_cors;
 
 		server_thread = std::thread([host, port, this] {
 			if (!server.listen(host, port)) {
@@ -66,6 +62,7 @@ public:
 
 private:
 	void ExecuteQuery(const Request &req, Response &res) const {
+		AddCorsHeaders(res);
 		auto execution_request = ExecutionRequest::FromRequest(req, api_key);
 		RETURN_IF_ERROR_CB(execution_request, ([&res](const ErrorData &error) { RespondError(error, res); }))
 		auto execution_error = execution_request->Execute(db_instance.lock(), res);
@@ -92,7 +89,18 @@ private:
 		res.set_content(error.Message(), "application/json");
 	}
 
+	void AddCorsHeaders(Response &res) const {
+		if (!enable_cors) {
+			return;
+		}
+		res.set_header("Access-Control-Allow-Origin", "*");
+		res.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+		res.set_header("Access-Control-Allow-Headers", "X-Api-Key, Content-Type");
+		res.set_header("Access-Control-Allow-Credentials", "true");
+	}
+
 	std::atomic_bool started {false};
+	bool enable_cors = false;
 	Server server;
 	std::string api_key {};
 	std::thread server_thread;

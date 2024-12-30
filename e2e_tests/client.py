@@ -28,6 +28,14 @@ class Client:
         response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
         files: list[str | Path] | None = None,
     ) -> dict:
+        return self.execute_query_raw(sql=sql, response_format=response_format, files=files).json()
+
+    def execute_query_raw(
+        self,
+        sql: str,
+        response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
+        files: list[str | Path] | None = None,
+    ) -> httpx.Response:
         files = files or []
 
         headers = {}
@@ -45,9 +53,8 @@ class Client:
 
         with httpx.Client(timeout=120) as client:
             response = client.post(self._url + "/query", headers=headers, json=body, files=transformed_files)
-            if not response.is_success:
-                raise Exception(response.text)
-            return response.json()
+            response.raise_for_status()
+            return response
 
     def ping(self, timeout: int | None = None) -> None:
         with httpx.Client(timeout=timeout) as client:

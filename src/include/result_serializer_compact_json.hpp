@@ -22,9 +22,6 @@ public:
 		SerializeInternal(query_result, yy_data_array, true);
 		yyjson_mut_obj_add_val(doc, root, "data", yy_data_array);
 
-		// TODO move into statistics at some point
-		yyjson_mut_obj_add_uint(doc, root, "rows", query_result.RowCount());
-
 		// Query statistics
 		yyjson_mut_val *yy_stats = GetStats(query_result);
 		yyjson_mut_obj_add_val(doc, root, "statistics", yy_stats);
@@ -48,6 +45,7 @@ private:
 
 	yyjson_mut_val *GetStats(const MaterializedQueryResult &query_result) {
 		auto stat_obj = yyjson_mut_obj(doc);
+		yyjson_mut_obj_add_uint(doc, stat_obj, "rows", query_result.RowCount());
 		return stat_obj;
 	}
 

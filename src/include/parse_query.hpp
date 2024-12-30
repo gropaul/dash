@@ -109,9 +109,9 @@ private:
 				std::advance(it, count);
 			}
 
-			return std::make_pair(req.get_file_value("query_json").content, req.files);
+			return std::make_pair(req.get_file_value("query_json").content, std::ref(req.files));
 		} else {
-			return std::make_pair(req.body, req.files);
+			return std::make_pair(req.body, std::ref(req.files));
 		}
 	}
 

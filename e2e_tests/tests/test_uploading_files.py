@@ -1,5 +1,6 @@
-from .client import Client
-from .const import PROJECT_DIR
+from e2e_tests.client import Client, ResponseFormat
+
+from e2e_tests.const import PROJECT_DIR
 
 
 def test_uploading_files(http_duck: Client):
