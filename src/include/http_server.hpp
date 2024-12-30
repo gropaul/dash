@@ -32,7 +32,7 @@ public:
 			throw ExecutorException("Server already started");
 		}
 
-		Printer::Print("Starting server on " + host + ":" + std::to_string(port));
+		Printer::Print("Starting server on http://" + host + ":" + std::to_string(port));
 
 		db_instance = c.db;
 		api_key = _api_key;
