@@ -1,36 +1,7 @@
 #pragma once
+#include "table_functions_bind_data.hpp"
+
 namespace duckdb {
-
-struct StartServerFunctionData final : FunctionData {
-	StartServerFunctionData(const string &_host, const int32_t _port, const string &_api_key, const bool _enable_cors)
-	    : host(_host), port(_port), api_key(_api_key), enable_cors(_enable_cors) {
-	}
-
-	unique_ptr<FunctionData> Copy() const override {
-		return make_uniq_base<FunctionData, StartServerFunctionData>(host, port, api_key, enable_cors);
-	}
-
-	bool Equals(const FunctionData &other_p) const override {
-		auto &other = other_p.Cast<StartServerFunctionData>();
-		return host == other.host && port == other.port && api_key == other.api_key && enable_cors == other.enable_cors;
-	}
-
-	const std::string host;
-	const int32_t port;
-	const std::string api_key;
-	const bool enable_cors;
-};
-
-struct EmptyFunctionData final : FunctionData {
-	unique_ptr<FunctionData> Copy() const override {
-		return make_uniq_base<FunctionData, EmptyFunctionData>();
-	}
-
-	bool Equals(const FunctionData &other_p) const override {
-		return true;
-	}
-};
-
 struct RunOnceGlobalTableFunctionState final : GlobalTableFunctionState {
 	std::atomic_bool has_run;
 
@@ -47,7 +18,7 @@ inline void StartHttpServer(ClientContext &context, TableFunctionInput &data, Da
 
 	auto &input = data.bind_data->Cast<StartServerFunctionData>();
 
-	GetServer(context).Start(context, input.host, input.port, input.api_key, input.enable_cors);
+	GetServer(context).Start(context, input);
 
 	output.SetCardinality(1);
 	output.SetValue(0, 0, true);
@@ -73,6 +44,17 @@ inline void StopHttpServer(ClientContext &context, TableFunctionInput &data, Dat
 	output.SetValue(0, 0, true);
 }
 
+template <typename T>
+T GetOrDefault(const TableFunctionBindInput &data, const string &key, T default_value,
+               const std::function<void(T &)> &validator = {}) {
+	if (data.named_parameters.find(key) != data.named_parameters.end()) {
+		auto param = data.named_parameters.at(key).GetValue<T>();
+		validator(param);
+		return param;
+	}
+	return default_value;
+}
+
 inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFunctionBindInput &input,
                                                     vector<LogicalType> &return_types, vector<string> &names) {
 	auto host = input.inputs[0].GetValue<string>();
@@ -81,23 +63,26 @@ inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFuncti
 	return_types.push_back(LogicalType::BOOLEAN);
 	names.push_back("success");
 
-	string api_key;
-	if (input.named_parameters.find("api_key") != input.named_parameters.end()) {
-		auto value = input.named_parameters.at("api_key").GetValue<string>();
+	const auto api_key = GetOrDefault<string>(input, "api_key", "", [](const string &value) {
 		if (value.empty()) {
 			throw BinderException("api_key cannot be an empty string");
 		}
-		api_key = value;
-	} else {
-		api_key = "";
-	}
+	});
 
-	bool enable_cors = false;
-	if (input.named_parameters.find("enable_cors") != input.named_parameters.end()) {
-		enable_cors = input.named_parameters.at("enable_cors").GetValue<bool>();
-	}
+	const auto enable_cors = GetOrDefault<bool>(input, "enable_cors", false);
+	const auto ui_proxy = GetOrDefault<string>(input, "ui_proxy", "", [](const string &value) {
+		const auto uri = Uri::Parse(value);
+		uri.AssertValid();
+		if (uri.Protocol != "http" && uri.Protocol != "https") {
+			throw BinderException("ui_proxy must be an HTTP or HTTPS URL");
+		}
+		if (!uri.QueryString.empty()) {
+			throw BinderException("ui_proxy cannot contain a query string");
+		}
+	});
 
-	return make_uniq_base<FunctionData, StartServerFunctionData>(host, port, api_key, enable_cors);
+	return make_uniq_base<FunctionData, StartServerFunctionData>(host, port, api_key, enable_cors,
+	                                                             Uri::Parse(ui_proxy));
 }
 
 } // namespace duckdb

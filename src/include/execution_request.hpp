@@ -39,7 +39,7 @@ struct ExecutionRequest {
 		// temporary table for each file
 		for (const auto &file : files) {
 			const auto &file_name = !file.second.filename.empty() ? file.second.filename : file.second.name;
-			if (file_name == "query_json") {
+			if (file_name == "query.json") {
 				continue;
 			}
 			const auto &file_data = file.second.content;
@@ -96,8 +96,8 @@ private:
 
 	static Result<std::pair<std::string, const MultipartFormDataMap &>> GetRequestBody(const Request &req) {
 		if (req.is_multipart_form_data()) {
-			if (!req.has_file("query_json")) {
-				return HttpErrorData {BadRequest_400, "Missing 'query_json' file"};
+			if (!req.has_file("query.json")) {
+				return HttpErrorData {BadRequest_400, "Missing 'query.json' file"};
 			}
 
 			// Make sure that the files does not have multiple values
@@ -109,7 +109,7 @@ private:
 				std::advance(it, count);
 			}
 
-			return std::make_pair(req.get_file_value("query_json").content, std::ref(req.files));
+			return std::make_pair(req.get_file_value("query.json").content, std::ref(req.files));
 		} else {
 			return std::make_pair(req.body, std::ref(req.files));
 		}

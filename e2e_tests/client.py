@@ -49,7 +49,7 @@ class Client:
             file_name = Path(file).name
             transformed_files[file_name] = open(file, "rb")
 
-        transformed_files["query_json"] = (None, json.dumps(body).encode("utf-8"), "application/json")
+        transformed_files["query.json"] = (None, json.dumps(body).encode("utf-8"), "application/json")
 
         with httpx.Client(timeout=120) as client:
             response = client.post(self._url + "/query", headers=headers, json=body, files=transformed_files)

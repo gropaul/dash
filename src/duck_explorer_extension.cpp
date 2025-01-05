@@ -28,6 +28,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		                 StartHttpServer, BindStartHttpServer, RunOnceGlobalTableFunctionState::Init);
 		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
 		tf.named_parameters["enable_cors"] = LogicalType::BOOLEAN;
+		tf.named_parameters["ui_proxy"] = LogicalType::VARCHAR;
 		CreateTableFunctionInfo tf_info(tf);
 		catalog.CreateTableFunction(context, &tf_info);
 	}

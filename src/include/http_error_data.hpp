@@ -1,11 +1,12 @@
 #pragma once
+#include "duckdb/common/error_data.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
 
 namespace duckdb {
 
-using namespace duckdb_httplib_openssl;
+using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 
 struct HttpErrorData : ErrorData {
 	HttpErrorData() = default;

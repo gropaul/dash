@@ -1,24 +1,44 @@
 # Duck_explorer
 
-## UI usage
+## Getting started
+
+### Installation
 
 ```sql
--- Starts the http server without auth and cors enabled
+FROM community INSTALL duck_explorer;
+LOAD
+duck_explorer;
+```
+
+### Usage
+
+```sql
+-- Starts the http server
 CALL start_duck_explorer('127.0.0.1', 4200)
 
--- Enable cors
+-- Enable cors (false by default)
 CALL start_duck_explorer('127.0.0.1', 4200, enable_cors=true);
 
--- Require authentication 
+-- Require authentication (off by default)
 CALL start_duck_explorer('127.0.0.1', 4200, api_key='abc123');
+
+-- Proxy the web UI from a different location
+CALL start_duck_explorer('127.0.0.1', 4200, ui_proxy='https://gropaul.github.io/explorer/');
 ```
 
 After starting the duck_explorer with any of the configurations you can then open the webui by
 opening http://127.0.0.1:4200 in your browser.
 
-## Http endpoints
+## API Endpoints
 
+| Endpoint | Method | Description                     | Parameters                                                                                                                                                                                                                                 |
+|----------|--------|---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/`      | GET    | View the integrated web UI.     |                                                                                                                                                                                                                                            |
+| `/query` | POST   | Execute an SQL query.           | **Header:** <br> - `X-Api-Key` (optional) – API key for authentication. <br><br> **Body (JSON):** <br> - `query` (string, required) – The SQL query to be executed. <br> - `format` (string, required) – Response format (`compact_json`). |
+| `/ping`  | GET    | Check if the server is running. |                                                                                                                                                                                                                                            |
 
+For detailed schema definitions and multipart handling, refer to the [API documentation](openapi.yaml) containing
+details on how to query files that are not (yet) stored in DuckDB by uploading them as multipart form data.
 
 ## Development
 

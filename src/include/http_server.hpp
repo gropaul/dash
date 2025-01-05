@@ -1,16 +1,17 @@
 #pragma once
 
 #include "duckdb/main/client_context.hpp"
-#include "files.hpp"
 #include "execution_request.hpp"
-#include "result.hpp"
+#include "files.hpp"
 #include "http_error_data.hpp"
+#include "result.hpp"
+#include "table_functions_bind_data.hpp"
+#include "uri.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
 
 namespace duckdb {
-
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
 
@@ -26,18 +27,21 @@ public:
 		Stop();
 	}
 
-	void Start(ClientContext &c, const std::string &host, const int32_t port, const std::string &_api_key,
-	           const bool _enable_cors) {
+	void Start(ClientContext &c, const StartServerFunctionData &data) {
 		if (started.exchange(true)) {
 			throw ExecutorException("Server already started");
 		}
 
-		Printer::Print("Starting server on http://" + host + ":" + std::to_string(port));
+		Printer::Print("Starting server on http://" + data.host + ":" + std::to_string(data.port));
 
 		db_instance = c.db;
-		api_key = _api_key;
-		enable_cors = _enable_cors;
 
+		api_key = data.api_key;
+		enable_cors = data.enable_cors;
+		ui_proxy = data.ui_proxy;
+
+		const auto host = data.host;
+		const auto port = data.port;
 		server_thread = std::thread([host, port, this] {
 			if (!server.listen(host, port)) {
 				Printer::Print("Failed to start HTTP server on " + host + ":" + std::to_string(port));
@@ -71,6 +75,14 @@ private:
 	}
 
 	void ServeUi(const Request &req, Response &res) const {
+		if (ui_proxy.Valid()) {
+			ServerFromProxy(req, res);
+		} else {
+			ServerFromLocal(req, res);
+		}
+	}
+
+	void ServerFromLocal(const Request &req, Response &res) const {
 		auto file = GetFile(req.path);
 		if (!file) {
 			res.status = 404;
@@ -78,10 +90,30 @@ private:
 			return;
 		}
 
-		Byte *data = file->content.data();
-		size_t size = file->content.size();
+		const Byte *data = file->content.data();
+		const size_t size = file->content.size();
 
 		res.set_content(reinterpret_cast<char const *>(data), size, file->content_type);
+	}
+
+	void ServerFromProxy(const Request &req, Response &res) const {
+		Client cli(ui_proxy.HostWithProtocol());
+		string path;
+		if (StringUtil::StartsWith(req.path, ui_proxy.Path)) {
+			path = req.path;
+		} else {
+			path = ui_proxy.Path + req.path;
+		}
+		auto response = cli.Get(path);
+
+		if (!response) {
+			res.status = 500;
+			res.set_content(to_string(response.error()), "text/plain");
+			return;
+		}
+
+		res.set_content(response->body.c_str(), response->body.size(), response->get_header_value("Content-Type"));
+		res.status = response->status;
 	}
 
 	static void RespondError(HttpErrorData error, Response &res) {
@@ -102,9 +134,12 @@ private:
 	}
 
 	std::atomic_bool started {false};
-	bool enable_cors = false;
 	Server server;
-	std::string api_key {};
+
+	string api_key {};
+	Uri ui_proxy {};
+	bool enable_cors = false;
+
 	std::thread server_thread;
 	weak_ptr<DatabaseInstance> db_instance;
 };

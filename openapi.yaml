@@ -22,16 +22,23 @@ paths:
         content:
           application/json:
             schema:
+              $ref: '#/components/schemas/QueryRequest'
+          multipart/form-data:
+            schema:
               type: object
               properties:
-                query:
+                query.json:
+                  allOf:
+                    - $ref: '#/components/schemas/QueryRequest'
                   type: string
-                  description: The SQL query to be executed.
-                  example: SELECT 1
-                format:
-                  type: string
-                  description: The response format.
-                  enum: [ compact_json ]
+                  title: JSON File
+                  format: application/json
+              additionalProperties:
+                type: string
+                format: binary
+                title: File
+                description: "Files that can then be referenced in THIS query"
+              required: [query.json]
       responses:
         '200':
           description: Query executed successfully.
@@ -79,6 +86,17 @@ components:
   schemas:
     Any:
       description: Can be any value - string, number, boolean, array or object.
+    QueryRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: The SQL query to be executed.
+          example: SELECT 1
+        format:
+          type: string
+          description: The response format.
+          enum: [ compact_json ]
     QueryResult:
       type: object
       properties:
