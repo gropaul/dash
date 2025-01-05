@@ -26,8 +26,7 @@ CALL start_duck_explorer('127.0.0.1', 4200, api_key='abc123');
 CALL start_duck_explorer('127.0.0.1', 4200, ui_proxy='https://gropaul.github.io/explorer/');
 ```
 
-After starting the duck_explorer with any of the configurations you can then open the webui by
-opening http://127.0.0.1:4200 in your browser.
+Once the _duck_explorer_ is running, access the WebUI by opening http://127.0.0.1:4200 in your browser.
 
 ## API Endpoints
 
@@ -37,8 +36,9 @@ opening http://127.0.0.1:4200 in your browser.
 | `/query` | POST   | Execute an SQL query.           | **Header:** <br> - `X-Api-Key` (optional) – API key for authentication. <br><br> **Body (JSON):** <br> - `query` (string, required) – The SQL query to be executed. <br> - `format` (string, required) – Response format (`compact_json`). |
 | `/ping`  | GET    | Check if the server is running. |                                                                                                                                                                                                                                            |
 
-For detailed schema definitions and multipart handling, refer to the [API documentation](openapi.yaml) containing
-details on how to query files that are not (yet) stored in DuckDB by uploading them as multipart form data.
+For detailed schema definitions refer to the [API documentation](openapi.yaml).
+This also contains instructions on querying and uploading files using the HTTP API. For a reference client
+implementation have a look at the [Python test client](./e2e_tests/client.py).
 
 ## Development
 
@@ -102,5 +102,5 @@ pip install -r requirements.txt
 Then run the test suite:
 
 ```bash
-pytest pytest test_http_api
+pytest e2e_tests
 ```
