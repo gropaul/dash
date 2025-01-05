@@ -1,0 +1,173 @@
+openapi: 3.0.0
+info:
+  title: Duck Explorer API
+  version: 0.0.1
+servers:
+  - url: http://localhost:4200
+paths:
+  /:
+    get:
+      summary: View Web UI
+      responses:
+        '200':
+          description: View the integrated web UI.
+          content:
+            text/html:
+              schema:
+                type: string
+  /query:
+    post:
+      summary: Execute SQL query
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: The SQL query to be executed.
+                  example: SELECT 1
+                format:
+                  type: string
+                  description: The response format.
+                  enum: [ compact_json ]
+      responses:
+        '200':
+          description: Query executed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          schema:
+            type: string
+          required: false
+          description: API key for authentication.
+  /ping:
+    get:
+      summary: Is running
+      responses:
+        '200':
+          description: Server is running.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: pong
+components:
+  schemas:
+    Any:
+      description: Can be any value - string, number, boolean, array or object.
+    QueryResult:
+      type: object
+      properties:
+        meta:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Any'
+        statistics:
+          type: object
+          properties:
+            rows:
+              type: integer
+              format: int64
+      required:
+        - meta
+        - data
+        - statistics
+    ErrorData:
+      type: object
+      properties:
+        exception_type:
+          $ref: '#/components/schemas/ExceptionType'
+        exception_message:
+          type: string
+          description: The error message.
+        extra_info:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional error information in key-value pairs.
+      required:
+        - exception_type
+        - exception_message
+      additionalProperties: true
+    ExceptionType:
+      description: The type of exception that occurred.
+      type: string
+      enum:
+        - INVALID
+        - OUT_OF_RANGE
+        - CONVERSION
+        - UNKNOWN_TYPE
+        - DECIMAL
+        - MISMATCH_TYPE
+        - DIVIDE_BY_ZERO
+        - OBJECT_SIZE
+        - INVALID_TYPE
+        - SERIALIZATION
+        - TRANSACTION
+        - NOT_IMPLEMENTED
+        - EXPRESSION
+        - CATALOG
+        - PARSER
+        - PLANNER
+        - SCHEDULER
+        - EXECUTOR
+        - CONSTRAINT
+        - INDEX
+        - STAT
+        - CONNECTION
+        - SYNTAX
+        - SETTINGS
+        - BINDER
+        - NETWORK
+        - OPTIMIZER
+        - NULL_POINTER
+        - IO
+        - INTERRUPT
+        - FATAL
+        - INTERNAL
+        - INVALID_INPUT
+        - OUT_OF_MEMORY
+        - PERMISSION
+        - PARAMETER_NOT_RESOLVED
+        - PARAMETER_NOT_ALLOWED
+        - DEPENDENCY
+        - HTTP
+        - MISSING_EXTENSION
+        - AUTOLOAD
+        - SEQUENCE
+        - INVALID_CONFIGURATION

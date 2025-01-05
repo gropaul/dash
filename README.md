@@ -1,5 +1,25 @@
 # Duck_explorer
 
+## UI usage
+
+```sql
+-- Starts the http server without auth and cors enabled
+CALL start_duck_explorer('127.0.0.1', 4200)
+
+-- Enable cors
+CALL start_duck_explorer('127.0.0.1', 4200, enable_cors=true);
+
+-- Require authentication 
+CALL start_duck_explorer('127.0.0.1', 4200, api_key='abc123');
+```
+
+After starting the duck_explorer with any of the configurations you can then open the webui by
+opening http://127.0.0.1:4200 in your browser.
+
+## Http endpoints
+
+
+
 ## Development
 
 ### Setting up the Repository
