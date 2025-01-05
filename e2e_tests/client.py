@@ -61,7 +61,7 @@ class Client:
             response = client.get(f"{self._url}/ping")
             response.raise_for_status()
 
-    def on_ready(self, timeout=5) -> None:
+    def on_ready(self, timeout=15) -> None:
         end_time = time.time() + timeout
         while time.time() < end_time:
             try:
