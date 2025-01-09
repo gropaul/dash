@@ -49,7 +49,10 @@ T GetOrDefault(const TableFunctionBindInput &data, const string &key, T default_
                const std::function<void(T &)> &validator = {}) {
 	if (data.named_parameters.find(key) != data.named_parameters.end()) {
 		auto param = data.named_parameters.at(key).GetValue<T>();
-		validator(param);
+		// if a validator is provided, run it
+		if (validator) {
+			validator(param);
+		}
 		return param;
 	}
 	return default_value;
