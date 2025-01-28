@@ -6,6 +6,7 @@
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "http_server.hpp"
+#include "json_result_collector.hpp"
 #include "table_functions.hpp"
 
 namespace duckdb {
@@ -16,8 +17,6 @@ static void LoadInternal(DatabaseInstance &instance) {
 	conn.Query("INSTALL json; LOAD json;");
 	conn.Query("INSTALL hostfs FROM community; LOAD hostfs;");
 	conn.BeginTransaction();
-	auto &context = *conn.context;
-	auto &catalog = Catalog::GetSystemCatalog(context);
 
 	{
 		TableFunction tf(std::string("start_duck_explorer"),
@@ -29,16 +28,26 @@ static void LoadInternal(DatabaseInstance &instance) {
 		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
 		tf.named_parameters["enable_cors"] = LogicalType::BOOLEAN;
 		tf.named_parameters["ui_proxy"] = LogicalType::VARCHAR;
-		CreateTableFunctionInfo tf_info(tf);
-		catalog.CreateTableFunction(context, &tf_info);
+		ExtensionUtil::RegisterFunction(instance, tf);
 	}
 
 	{
 
 		TableFunction tf(std::string("stop_duck_explorer"), {}, StopHttpServer, BindStopHttpServer,
 		                 RunOnceGlobalTableFunctionState::Init);
-		CreateTableFunctionInfo tf_info(tf);
-		catalog.CreateTableFunction(context, &tf_info);
+		ExtensionUtil::RegisterFunction(instance, tf);
+	}
+
+	{
+		pragma_query_t to_json = [](ClientContext &context, const FunctionParameters &type) -> string {
+			ClientConfig::GetConfig(context).result_collector = [](ClientContext &, PreparedStatementData &data) {
+				return make_uniq<JsonResultCollector>(data);
+			};
+			return type.values[0].ToString();
+		};
+
+		auto parquet_key_fun = PragmaFunction::PragmaCall("to_json", to_json, {LogicalType::VARCHAR});
+		ExtensionUtil::RegisterFunction(instance, parquet_key_fun);
 	}
 
 	conn.Commit();
