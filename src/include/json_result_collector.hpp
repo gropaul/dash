@@ -2,6 +2,8 @@
 #include "duckdb/execution/operator/helper/physical_materialized_collector.hpp"
 #include "duckdb/execution/operator/helper/physical_result_collector.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
+#include "response_format.hpp"
+#include "serializer/result_serializer.hpp"
 
 namespace duckdb {
 

@@ -2,7 +2,7 @@
 
 #include "duckdb/main/materialized_query_result.hpp"
 #include "duckdb/main/query_result.hpp"
-#include "string.hpp"
+#include "string_util.hpp"
 #include "yyjson.hpp"
 
 namespace duckdb {

@@ -4,19 +4,20 @@
 
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
+#ifndef EMSCRIPTEN
 #include "http_server.hpp"
-#include "json_result_collector.hpp"
 #include "table_functions.hpp"
+#endif
+#include "json_result_collector.hpp"
+#include "response_format.hpp"
+#include "string_util.hpp"
 
 namespace duckdb {
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection conn(instance);
-	conn.Query("INSTALL httpfs; LOAD httpfs;");
-	conn.Query("INSTALL json; LOAD json;");
-	conn.Query("INSTALL hostfs FROM community; LOAD hostfs;");
 	conn.BeginTransaction();
-
+#ifndef EMSCRIPTEN
 	{
 		TableFunction tf(std::string("start_duck_explorer"),
 		                 {
@@ -36,7 +37,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		                 RunOnceGlobalTableFunctionState::Init);
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}
-
+#endif
 	{
 		pragma_query_t as_json = [](ClientContext &context, const FunctionParameters &type) -> string {
 			ResponseFormat serializer_format;
