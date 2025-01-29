@@ -1,10 +1,12 @@
 #pragma once
+
 #include "result_serializer.hpp"
 
 namespace duckdb {
 
 class ResultSerializerCompactJson final : public ResultSerializer {
-public:
+	friend class ResultSerializer;
+
 	explicit ResultSerializerCompactJson(const bool _set_invalid_values_to_null = false)
 	    : ResultSerializer(_set_invalid_values_to_null) {
 		root = yyjson_mut_obj(doc);
@@ -12,7 +14,7 @@ public:
 		yyjson_mut_doc_set_root(doc, root);
 	}
 
-	std::string Serialize(MaterializedQueryResult &query_result) {
+	std::string Serialize(MaterializedQueryResult &query_result) override {
 		// Metadata about the query result
 		yyjson_mut_val *yy_meta = GetMeta(query_result);
 		yyjson_mut_obj_add_val(doc, root, "meta", yy_meta);

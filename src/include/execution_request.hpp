@@ -1,10 +1,11 @@
 #pragma once
 
 #include "auto_cleaner.hpp"
-#include "duckdb/main/client_context.hpp"
 #include "duckdb/main/client_data.hpp"
+#include "duckdb/main/connection.hpp"
+#include "response_format.hpp"
 #include "result.hpp"
-#include "result_serializer_compact_json.hpp"
+#include "serializer/result_serializer.hpp"
 #include "temp_file.hpp"
 #include "yyjson.hpp"
 
@@ -14,11 +15,6 @@
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
-
-enum class ResponseFormat {
-	INVALID,
-	COMPACT_JSON,
-};
 
 struct ExecutionRequest {
 	const std::string query {};
@@ -60,8 +56,8 @@ struct ExecutionRequest {
 			return {BadRequest_400, result->GetErrorObject()};
 		}
 
-		ResultSerializerCompactJson serializer;
-		const auto json = serializer.Serialize(*result);
+		auto serializer = ResultSerializer::Create(format);
+		const auto json = serializer->Serialize(*result);
 		res.set_content(json, "application/json");
 
 		return nullptr;

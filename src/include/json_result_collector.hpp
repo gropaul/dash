@@ -5,10 +5,11 @@
 
 namespace duckdb {
 
-class JsonResultCollector : public PhysicalMaterializedCollector {
+class JsonResultCollector final : public PhysicalMaterializedCollector {
 public:
-	explicit JsonResultCollector(ClientContext &context, PreparedStatementData &data)
-	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, *data.plan)) {
+	explicit JsonResultCollector(ClientContext &context, PreparedStatementData &data, const ResponseFormat format_)
+	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, *data.plan)),
+	      format(format_) {
 	}
 
 private:
@@ -16,8 +17,8 @@ private:
 		unique_ptr<QueryResult> result = PhysicalMaterializedCollector::GetResult(state);
 		auto materialized_result = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(result));
 
-		ResultSerializerCompactJson serializer;
-		auto serialized = serializer.Serialize(*materialized_result);
+		auto serializer = ResultSerializer::Create(format);
+		auto serialized = serializer->Serialize(*materialized_result);
 
 		DataChunk json_buffer;
 		json_buffer.Initialize(Allocator::DefaultAllocator(), {LogicalType::VARCHAR}, 2);
@@ -30,5 +31,6 @@ private:
 		return make_uniq<MaterializedQueryResult>(statement_type, properties, vector<string> {"json"},
 		                                          std::move(collection), materialized_result->client_properties);
 	}
+	const ResponseFormat format;
 };
 } // namespace duckdb

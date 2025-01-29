@@ -2,7 +2,6 @@
 
 #include "duck_explorer_extension.hpp"
 
-#include "duckdb.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "http_server.hpp"
@@ -40,14 +39,24 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	{
 		pragma_query_t to_json = [](ClientContext &context, const FunctionParameters &type) -> string {
-			ClientConfig::GetConfig(context).result_collector = [](ClientContext &c, PreparedStatementData &data) {
-				return make_uniq<JsonResultCollector>(c, data);
+			ResponseFormat serializer_format;
+			const auto format_it = type.named_parameters.find("format");
+			if (format_it != type.named_parameters.end()) {
+				serializer_format = string_util::FromString<ResponseFormat>(format_it->second.ToString());
+			} else {
+				serializer_format = ResponseFormat::COMPACT_JSON;
+			}
+
+			ClientConfig::GetConfig(context).result_collector = [serializer_format](ClientContext &c,
+			                                                                        PreparedStatementData &data) {
+				return make_uniq<JsonResultCollector>(c, data, serializer_format);
 			};
 			return type.values[0].ToString();
 		};
 
-		auto parquet_key_fun = PragmaFunction::PragmaCall("to_json", to_json, {LogicalType::VARCHAR});
-		ExtensionUtil::RegisterFunction(instance, parquet_key_fun);
+		auto to_json_fun = PragmaFunction::PragmaCall("to_json", to_json, {LogicalType::VARCHAR});
+		to_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
+		ExtensionUtil::RegisterFunction(instance, to_json_fun);
 	}
 
 	conn.Commit();

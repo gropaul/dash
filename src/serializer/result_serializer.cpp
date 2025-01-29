@@ -1,7 +1,8 @@
-#include "result_serializer.hpp"
+#include "serializer/result_serializer.hpp"
 
 #include "duckdb/common/extra_type_info.hpp"
 #include "duckdb/common/types/uuid.hpp"
+#include "serializer/result_serializer_compact_json.hpp"
 
 #include <cmath>
 
@@ -11,6 +12,18 @@ namespace duckdb {
 	if (!success) {                                                                                                    \
 		throw SerializationException("Failed to append in " __FILE__, __LINE__);                                       \
 	}
+
+unique_ptr<ResultSerializer> ResultSerializer::Create(const ResponseFormat type,
+                                                      const bool _set_invalid_values_to_null) {
+	switch (type) {
+	case ResponseFormat::COMPACT_JSON: {
+		auto t = unique_ptr<ResultSerializerCompactJson>(new ResultSerializerCompactJson(_set_invalid_values_to_null));
+		return unique_ptr_cast<ResultSerializerCompactJson, ResultSerializer>(std::move(t));
+	}
+	default:
+		throw SerializationException("Unknown response format: " + string_util::ToString(type));
+	}
+}
 
 void ResultSerializer::SerializeInternal(QueryResult &query_result, yyjson_mut_val *append_root,
                                          const bool values_as_array) {

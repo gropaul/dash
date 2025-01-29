@@ -17,7 +17,7 @@ include_directories(src/include duckdb/third_party/httplib)
 set(EXTENSION_SOURCES
         src/duck_explorer_extension.cpp
         src/gen/files.cpp
-        src/result_serializer.cpp
+        src/serializer/result_serializer.cpp
         src/temp_file.cpp
 )
 
@@ -29,7 +29,7 @@ target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 install(
-  TARGETS ${EXTENSION_NAME}
-  EXPORT "${DUCKDB_EXPORT_SET}"
-  LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
-  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
+        TARGETS ${EXTENSION_NAME}
+        EXPORT "${DUCKDB_EXPORT_SET}"
+        LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
+        ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
