@@ -38,13 +38,13 @@ static void LoadInternal(DatabaseInstance &instance) {
 	}
 
 	{
-		pragma_query_t to_json = [](ClientContext &context, const FunctionParameters &type) -> string {
+		pragma_query_t as_json = [](ClientContext &context, const FunctionParameters &type) -> string {
 			ResponseFormat serializer_format;
 			const auto format_it = type.named_parameters.find("format");
 			if (format_it != type.named_parameters.end()) {
 				serializer_format = string_util::FromString<ResponseFormat>(format_it->second.ToString());
 			} else {
-				serializer_format = ResponseFormat::COMPACT_JSON;
+				serializer_format = ResponseFormat::JSON;
 			}
 
 			ClientConfig::GetConfig(context).result_collector = [serializer_format](ClientContext &c,
@@ -54,9 +54,9 @@ static void LoadInternal(DatabaseInstance &instance) {
 			return type.values[0].ToString();
 		};
 
-		auto to_json_fun = PragmaFunction::PragmaCall("to_json", to_json, {LogicalType::VARCHAR});
-		to_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
-		ExtensionUtil::RegisterFunction(instance, to_json_fun);
+		auto as_json_fun = PragmaFunction::PragmaCall("as_json", as_json, {LogicalType::VARCHAR});
+		as_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
+		ExtensionUtil::RegisterFunction(instance, as_json_fun);
 	}
 
 	conn.Commit();

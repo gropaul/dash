@@ -96,7 +96,7 @@ components:
         format:
           type: string
           description: The response format.
-          enum: [ compact_json ]
+          enum: [ compact_json, json ]
     QueryResult:
       type: object
       properties:

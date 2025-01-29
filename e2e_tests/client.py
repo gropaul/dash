@@ -11,6 +11,7 @@ from httpx._types import FileTypes
 
 class ResponseFormat(Enum):
     COMPACT_JSON = "compact_json"
+    JSON = "json"
 
 
 class Client:
@@ -25,7 +26,7 @@ class Client:
     def execute_query(
         self,
         sql: str,
-        response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
+        response_format: ResponseFormat,
         files: list[str | Path] | None = None,
     ) -> dict:
         return self.execute_query_raw(sql=sql, response_format=response_format, files=files).json()
@@ -33,7 +34,7 @@ class Client:
     def execute_query_raw(
         self,
         sql: str,
-        response_format: ResponseFormat = ResponseFormat.COMPACT_JSON,
+        response_format: ResponseFormat,
         files: list[str | Path] | None = None,
     ) -> httpx.Response:
         files = files or []

@@ -31,7 +31,6 @@ class ResultSerializerCompactJson final : public ResultSerializer {
 		return YY_ToString();
 	}
 
-private:
 	yyjson_mut_val *GetMeta(QueryResult &query_result) {
 		auto meta_array = yyjson_mut_arr(doc);
 		for (idx_t col = 0; col < query_result.ColumnCount(); ++col) {

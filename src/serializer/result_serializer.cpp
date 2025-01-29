@@ -3,6 +3,7 @@
 #include "duckdb/common/extra_type_info.hpp"
 #include "duckdb/common/types/uuid.hpp"
 #include "serializer/result_serializer_compact_json.hpp"
+#include "serializer/result_serializer_json.hpp"
 
 #include <cmath>
 
@@ -19,6 +20,10 @@ unique_ptr<ResultSerializer> ResultSerializer::Create(const ResponseFormat type,
 	case ResponseFormat::COMPACT_JSON: {
 		auto t = unique_ptr<ResultSerializerCompactJson>(new ResultSerializerCompactJson(_set_invalid_values_to_null));
 		return unique_ptr_cast<ResultSerializerCompactJson, ResultSerializer>(std::move(t));
+	}
+	case ResponseFormat::JSON: {
+		auto t = unique_ptr<ResultSerializerJson>(new ResultSerializerJson(_set_invalid_values_to_null));
+		return unique_ptr_cast<ResultSerializerJson, ResultSerializer>(std::move(t));
 	}
 	default:
 		throw SerializationException("Unknown response format: " + string_util::ToString(type));

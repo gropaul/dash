@@ -30,15 +30,49 @@ Once the _duck_explorer_ is running, access the WebUI by opening http://127.0.0.
 
 ## API Endpoints
 
-| Endpoint | Method | Description                     | Parameters                                                                                                                                                                                                                                 |
-|----------|--------|---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/`      | GET    | View the integrated web UI.     |                                                                                                                                                                                                                                            |
-| `/query` | POST   | Execute an SQL query.           | **Header:** <br> - `X-Api-Key` (optional) – API key for authentication. <br><br> **Body (JSON):** <br> - `query` (string, required) – The SQL query to be executed. <br> - `format` (string, required) – Response format (`compact_json`). |
-| `/ping`  | GET    | Check if the server is running. |                                                                                                                                                                                                                                            |
+| Endpoint | Method | Description                     | Parameters                                                                                                                                                                                                                               |
+|----------|--------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/`      | GET    | View the integrated web UI.     |                                                                                                                                                                                                                                          |
+| `/query` | POST   | Execute an SQL query.           | **Header:** <br> - `X-Api-Key` (optional) – API key for authentication. <br><br> **Body (JSON):** <br> - `query` (string, required) – The SQL query to be executed. <br> - `format` (string, required) – Response format (`compact_json` | `json`). |
+| `/ping`  | GET    | Check if the server is running. |                                                                                                                                                                                                                                          |
 
 For detailed schema definitions refer to the [API documentation](openapi.yaml).
 This also contains instructions on querying and uploading files using the HTTP API. For a reference client
 implementation have a look at the [Python test client](./e2e_tests/client.py).
+
+## Serialization pragmas
+
+The extension provides a set of pragmas to control the serialization of queries. These **SHOULD** be used independently
+of the web UI or the HTTP API and using them in a statement sent to the HTTP API is not advised, as the HTTP API already
+serializes the results using the same format.
+
+```sql
+-- Default format is JSON
+PRAGMA AS_JSON('SELECT {''key1'': range} as map, range FROM range(2)');
+
+PRAGMA AS_JSON('FROM range(2)', format='JSON');
+-- Output:
+-- [
+--   {"map":{"key1":0},"range":0},
+--   {"map":{"key1":1},"range":1}
+-- ]
+       
+PRAGMA AS_JSON('FROM range(2)', format='COMPACT_JSON');
+-- Output:       
+-- {
+--   "meta": [
+--     {"name": "map","type": "STRUCT(key1 BIGINT)"},
+--     {"name": "range","type": "BIGINT"}
+--   ],
+--   "data": [
+--     [{"key1": 0},0],
+--     [{"key1": 1},1]
+--   ],
+--   "statistics": {
+--     "rows": 2
+--   }
+-- }
+```
 
 ## Development
 

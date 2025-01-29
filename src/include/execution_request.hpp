@@ -140,12 +140,12 @@ private:
 			return HttpErrorData {BadRequest_400, "Expected 'format' field as string"};
 		}
 
-		ResponseFormat format = ResponseFormat::INVALID;
+		auto format = ResponseFormat::INVALID;
 		const std::string format_str = yyjson_get_str(format_obj);
-		if (StringUtil::Lower(format_str) == "compact_json") {
-			format = ResponseFormat::COMPACT_JSON;
-		} else {
-			return HttpErrorData {BadRequest_400, "Unknown format: " + format_str};
+		try {
+			format = string_util::FromString<ResponseFormat>(format_str);
+		} catch (const std::exception &ex) {
+			return HttpErrorData {BadRequest_400, ex.what()};
 		}
 
 		return ExecutionRequest(query, format, files);
