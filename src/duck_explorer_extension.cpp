@@ -40,8 +40,8 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	{
 		pragma_query_t to_json = [](ClientContext &context, const FunctionParameters &type) -> string {
-			ClientConfig::GetConfig(context).result_collector = [](ClientContext &, PreparedStatementData &data) {
-				return make_uniq<JsonResultCollector>(data);
+			ClientConfig::GetConfig(context).result_collector = [](ClientContext &c, PreparedStatementData &data) {
+				return make_uniq<JsonResultCollector>(c, data);
 			};
 			return type.values[0].ToString();
 		};
