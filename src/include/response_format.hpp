@@ -1,7 +1,7 @@
 #pragma once
 
 enum class ResponseFormat {
-	INVALID,
+	INVALID = 0,
 	COMPACT_JSON,
 	JSON,
 };

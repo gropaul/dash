@@ -227,7 +227,6 @@ void ResultSerializer::SerializeValue( // NOLINT(*-no-recursion)
 
 		break;
 	}
-		// Not implemented types
 	case LogicalTypeId::MAP: {
 		auto &children = ListValue::GetChildren(value);
 		val = yyjson_mut_obj(doc);

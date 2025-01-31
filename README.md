@@ -50,14 +50,14 @@ serializes the results using the same format.
 -- Default format is JSON
 PRAGMA AS_JSON('SELECT {''key1'': range} as map, range FROM range(2)');
 
-PRAGMA AS_JSON('FROM range(2)', format='JSON');
+PRAGMA AS_JSON('SELECT {''key1'': range} as map, range FROM range(2)', format='JSON');
 -- Output:
 -- [
 --   {"map":{"key1":0},"range":0},
 --   {"map":{"key1":1},"range":1}
 -- ]
        
-PRAGMA AS_JSON('FROM range(2)', format='COMPACT_JSON');
+PRAGMA AS_JSON('SELECT {''key1'': range} as map, range FROM range(2)', format='COMPACT_JSON');
 -- Output:       
 -- {
 --   "meta": [

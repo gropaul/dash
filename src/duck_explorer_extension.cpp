@@ -48,11 +48,13 @@ static void LoadInternal(DatabaseInstance &instance) {
 				serializer_format = ResponseFormat::JSON;
 			}
 
-			ClientConfig::GetConfig(context).result_collector = [serializer_format](ClientContext &c,
-			                                                                        PreparedStatementData &data) {
-				ClientConfig::GetConfig(c).result_collector = nullptr;
-				return make_uniq<JsonResultCollector>(c, data, serializer_format);
-			};
+			auto& client_config = ClientConfig::GetConfig(context);
+			auto previous_result_collector = client_config.result_collector;
+			client_config.result_collector = [serializer_format, previous_result_collector] //
+			    (ClientContext & c, PreparedStatementData & data) {
+				    ClientConfig::GetConfig(c).result_collector = previous_result_collector;
+				    return make_uniq<JsonResultCollector>(c, data, serializer_format);
+			    };
 			return type.values[0].ToString();
 		};
 
