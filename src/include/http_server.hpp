@@ -27,12 +27,38 @@ public:
 		Stop();
 	}
 
+	void XorEncrypt(std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
+		D_ASSERT(!key.empty());
+		for (size_t i = 0; i < data.size(); i++) {
+			data[i] ^= key[i % key.size()];
+		}
+	}
+
+	std::string XorEncrypt(const std::string& data, const std::string& key) {
+		std::vector<uint8_t> data_vec(data.begin(), data.end());
+		std::vector<uint8_t> key_vec(key.begin(), key.end());
+		XorEncrypt(data_vec, key_vec);
+		return std::string(data_vec.begin(), data_vec.end());
+	}
+
 	void Start(ClientContext &c, const StartServerFunctionData &data) {
 		if (started.exchange(true)) {
 			throw ExecutorException("Server already started");
 		}
 
-		Printer::Print("Starting server on http://" + data.host + ":" + std::to_string(data.port));
+		std::string base_url = "http://" +  data.host + ":" + std::to_string(data.port);
+		std::string user_click_url = base_url;
+		// say that the client should use the duckdbhttp API
+		user_click_url += "/?api=http";
+		// add an url parameter that tells the client where to find the API
+		user_click_url += "&url=" + StringUtil::URLEncode(base_url);
+		// add the API key if it is set
+		if (!data.api_key.empty()) {
+			auto encryption_key = "DuckDB"; // this should not be secure, but just obfuscate the key
+			auto encrypted_api_key = XorEncrypt(data.api_key, encryption_key);
+			user_click_url += "&k=" + StringUtil::URLEncode(encrypted_api_key);
+		}
+		Printer::Print("Starting server on " + user_click_url);
 
 		db_instance = c.db;
 
