@@ -49,9 +49,8 @@ public:
 		std::string base_url = "http://" +  data.host + ":" + std::to_string(data.port);
 		std::string user_click_url = base_url;
 		// say that the client should use the duckdbhttp API
+		// without specifying the url parameter, the client will use the same URL as the server
 		user_click_url += "/?api=http";
-		// add an url parameter that tells the client where to find the API
-		user_click_url += "&url=" + StringUtil::URLEncode(base_url);
 		// add the API key if it is set
 		if (!data.api_key.empty()) {
 			auto encryption_key = "DuckDB"; // this should not be secure, but just obfuscate the key

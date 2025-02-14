@@ -61,7 +61,18 @@ static void LoadInternal(DatabaseInstance &instance) {
 		auto as_json_fun = PragmaFunction::PragmaCall("as_json", as_json, {LogicalType::VARCHAR});
 		as_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
 		ExtensionUtil::RegisterFunction(instance, as_json_fun);
+
+		pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
+			return "CALL start_duck_explorer('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=True);";
+		};
+
+		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
+		ExtensionUtil::RegisterFunction(instance, dash);
+
 	}
+
+
+
 
 	conn.Commit();
 }
