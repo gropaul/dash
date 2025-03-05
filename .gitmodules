@@ -9,3 +9,4 @@
 [submodule "dash-ui"]
 	path = dash-ui
 	url = git@github.com:gropaul/dash-ui.git
+	branch = main
