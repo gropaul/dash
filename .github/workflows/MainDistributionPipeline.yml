@@ -13,52 +13,27 @@ concurrency:
 
 jobs:
   duckdb-next-build:
-    needs: build_ui
     name: Build extension binaries
-    uses: NiclasHaderer/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
     with:
       duckdb_version: main
       ci_tools_version: main
-      extension_name: duck_explorer
-      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads'
+      extension_name: dash
 
   duckdb-stable-build:
-    needs: build_ui
     name: Build extension binaries
-    uses: NiclasHaderer/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.1.3
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.1.1
     with:
-      duckdb_version: v1.1.3
-      ci_tools_version: v1.1.3
-      extension_name: duck_explorer
+      duckdb_version: v1.1.1
+      ci_tools_version: v1.1.1
+      extension_name: dash
 
-  build_ui:
-    name: Build UI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        name: Checkout Root repository
-        with:
-          fetch-depth: 0
-          submodules: true
-      - name: Install package manager
-        run: npm install -g pnpm
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-          cache-dependency-path: explorer-ui/pnpm-lock.yaml
-      - name: Install dependencies
-        working-directory: explorer-ui
-        run: pnpm install --frozen-lockfile
-      - name: Build with Next.js
-        working-directory: explorer-ui
-        run: pnpm next build
-        env:
-          NEXT_PUBLIC_BASE_PATH: ""
-      - name: Generate source files
-        run: python3 scripts/gen_ui_files.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: embedded-ui
-          path: src/gen
+  duckdb-stable-deploy:
+    name: Deploy extension binaries
+    needs: duckdb-stable-build
+    uses: ./.github/workflows/_extension_deploy.yml
+    secrets: inherit
+    with:
+      duckdb_version: v1.1.1
+      extension_name: dash
+      deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
