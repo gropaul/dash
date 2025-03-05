@@ -20,7 +20,7 @@ def _start_server(start_cmd: str, client: Client) -> Iterator[Client]:
     )
 
     # Load the extension
-    process.stdin.write("LOAD duck_explorer;\n")
+    process.stdin.write("LOAD dash;\n")
     process.stdin.write(start_cmd)
 
     client.on_ready()
@@ -31,14 +31,14 @@ def _start_server(start_cmd: str, client: Client) -> Iterator[Client]:
 
 @pytest.fixture
 def http_duck() -> Iterator[Client]:
-    for client in _start_server(f"CALL start_duck_explorer('{HOST}', {PORT});\n", Client(f"http://{HOST}:{PORT}")):
+    for client in _start_server(f"CALL start_dash('{HOST}', {PORT});\n", Client(f"http://{HOST}:{PORT}")):
         yield client
 
 
 @pytest.fixture
 def cors_duck() -> Iterator[Client]:
     for client in _start_server(
-        f"CALL start_duck_explorer('{HOST}', {PORT}, enable_cors=true);\n", Client(f"http://{HOST}:{PORT}")
+        f"CALL start_dash('{HOST}', {PORT}, enable_cors=true);\n", Client(f"http://{HOST}:{PORT}")
     ):
         yield client
 
@@ -46,6 +46,6 @@ def cors_duck() -> Iterator[Client]:
 @pytest.fixture
 def http_duck_auth() -> Iterator[Client]:
     for client in _start_server(
-        f"CALL start_duck_explorer('{HOST}', {PORT}, api_key='{API_KEY}');\n", Client(f"http://{HOST}:{PORT}", API_KEY)
+        f"CALL start_dash('{HOST}', {PORT}, api_key='{API_KEY}');\n", Client(f"http://{HOST}:{PORT}", API_KEY)
     ):
         yield client

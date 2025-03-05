@@ -114,18 +114,18 @@ def install_tools():
     else:
         print("Failed to run npm from the new installation.")
 
-
+# test
 def build_ui():
-    # go to the explorer-ui directory
-    explorer_ui_dir = os.path.join(os.path.dirname(__file__), "..", "explorer-ui")
-    # check if the explorer-ui directory exists
-    if not os.path.exists(explorer_ui_dir):
-        print("explorer-ui directory not found at", explorer_ui_dir)
-        print("Please clone the explorer-ui repository in the root directory of the extension repository.")
+    # go to the dash-ui directory
+    dash_ui_dir = os.path.join(os.path.dirname(__file__), "..", "dash-ui")
+    # check if the dash-ui directory exists
+    if not os.path.exists(dash_ui_dir):
+        print("dash-ui directory not found at", dash_ui_dir)
+        print("Please clone the dash-ui repository in the root directory of the extension repository.")
         sys.exit(1)
 
-    # change the current working directory to explorer-ui
-    os.chdir(explorer_ui_dir)
+    # change the current working directory to dash-ui
+    os.chdir(dash_ui_dir)
 
     # check if npm is installed
     if not shutil.which("npm"):
@@ -227,7 +227,7 @@ def get_content_type(file: str) -> str:
 
 
 def generate_ui_files():
-    base_path = os.path.join(root_dir, "explorer-ui", "out")
+    base_path = os.path.join(root_dir, "dash-ui", "out")
     target_dir = os.path.dirname(target_file)
     if os.path.exists(target_dir):
         shutil.rmtree(target_dir)

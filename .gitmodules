@@ -6,6 +6,6 @@
 	path = extension-ci-tools
 	url = https://github.com/duckdb/extension-ci-tools
 	branch = main
-[submodule "explorer-ui"]
-	path = explorer-ui
-	url = git@github.com:gropaul/explorer.git
+[submodule "dash-ui"]
+	path = dash-ui
+	url = https://github.com/gropaul/dash-ui

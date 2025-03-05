@@ -1,32 +1,32 @@
-# Duck_explorer
+# Dash
 
 ## Getting started
 
 ### Installation
 
 ```sql
-FROM community INSTALL duck_explorer;
+FROM community INSTALL dash;
 LOAD
-duck_explorer;
+dash;
 ```
 
 ### Usage
 
 ```sql
 -- Starts the http server
-CALL start_duck_explorer('127.0.0.1', 4200)
+CALL start_dash('127.0.0.1', 4200)
 
 -- Enable cors (false by default)
-CALL start_duck_explorer('127.0.0.1', 4200, enable_cors=true);
+CALL start_dash('127.0.0.1', 4200, enable_cors=true);
 
 -- Require authentication (off by default)
-CALL start_duck_explorer('127.0.0.1', 4200, api_key='abc123');
+CALL start_dash('127.0.0.1', 4200, api_key='abc123');
 
 -- Proxy the web UI from a different location
-CALL start_duck_explorer('127.0.0.1', 4200, ui_proxy='https://gropaul.github.io/explorer/');
+CALL start_dash('127.0.0.1', 4200, ui_proxy='https://gropaul.github.io/dash-ui/');
 ```
 
-Once the _duck_explorer_ is running, access the WebUI by opening http://127.0.0.1:4200 in your browser.
+Once the _dash_ is running, access the WebUI by opening http://127.0.0.1:4200 in your browser.
 
 ## API Endpoints
 
@@ -85,10 +85,10 @@ git clone <your-fork-url>
 git submodule update --init --recursive
 ```
 
-**Build the UI:** Change into the _explorer-ui_ directory and build the UI
+**Build the UI:** Change into the _dash-ui_ directory and build the UI
 
 ```bash
-cd explorer-ui
+cd dash-ui
 pnpm install --frozen-lockfile
 NEXT_PUBLIC_API_URL="" pnpm run build
 ```

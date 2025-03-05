@@ -1,16 +1,16 @@
 #define DUCKDB_EXTENSION_MAIN
 
-#include "duck_explorer_extension.hpp"
+#include "include/dash_extension.hpp"
 
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #ifndef EMSCRIPTEN
-#include "http_server.hpp"
-#include "table_functions.hpp"
+#include "include/http_server.hpp"
+#include "include/table_functions.hpp"
 #endif
-#include "json_result_collector.hpp"
-#include "response_format.hpp"
-#include "string_util.hpp"
+#include "include/json_result_collector.hpp"
+#include "include/response_format.hpp"
+#include "include/string_util.hpp"
 
 namespace duckdb {
 
@@ -19,7 +19,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 	conn.BeginTransaction();
 #ifndef EMSCRIPTEN
 	{
-		TableFunction tf(std::string("start_duck_explorer"),
+		TableFunction tf(std::string("start_dash"),
 		                 {
 		                     LogicalType::VARCHAR, // Host
 		                     LogicalType::INTEGER  // Port
@@ -33,7 +33,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	{
 
-		TableFunction tf(std::string("stop_duck_explorer"), {}, StopHttpServer, BindStopHttpServer,
+		TableFunction tf(std::string("stop_dash"), {}, StopHttpServer, BindStopHttpServer,
 		                 RunOnceGlobalTableFunctionState::Init);
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}
@@ -63,7 +63,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		ExtensionUtil::RegisterFunction(instance, as_json_fun);
 
 		pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
-			return "CALL start_duck_explorer('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=True);";
+			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=True);";
 		};
 
 		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
@@ -77,16 +77,16 @@ static void LoadInternal(DatabaseInstance &instance) {
 	conn.Commit();
 }
 
-void DuckExplorerExtension::Load(DuckDB &db) {
+void DashExtension::Load(DuckDB &db) {
 	LoadInternal(*db.instance);
 }
-std::string DuckExplorerExtension::Name() {
-	return "duck_explorer";
+std::string DashExtension::Name() {
+	return "dash";
 }
 
-std::string DuckExplorerExtension::Version() const {
-#ifdef EXT_VERSION_DUCK_EXPLORER
-	return EXT_VERSION_DUCK_EXPLORER;
+std::string DashExtension::Version() const {
+#ifdef EXT_VERSION_DASH
+	return EXT_VERSION_DASH;
 #else
 	return "";
 #endif
@@ -96,12 +96,12 @@ std::string DuckExplorerExtension::Version() const {
 
 extern "C" {
 
-DUCKDB_EXTENSION_API void duck_explorer_init(duckdb::DatabaseInstance &db) {
+DUCKDB_EXTENSION_API void dash_init(duckdb::DatabaseInstance &db) {
 	duckdb::DuckDB db_wrapper(db);
-	db_wrapper.LoadExtension<duckdb::DuckExplorerExtension>();
+	db_wrapper.LoadExtension<duckdb::DashExtension>();
 }
 
-DUCKDB_EXTENSION_API const char *duck_explorer_version() {
+DUCKDB_EXTENSION_API const char *dash_version() {
 	return duckdb::DuckDB::LibraryVersion();
 }
 }

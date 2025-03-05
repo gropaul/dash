@@ -15,15 +15,15 @@ namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
 
-class DuckExplorerHttpServer {
+class DashHttpServer {
 public:
-	DuckExplorerHttpServer() {
+	DashHttpServer() {
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Get("/ping", [](const Request &, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
 		server.Options(".*", [this](const Request &, Response &res) { AddCorsHeaders(res); });
 	}
-	~DuckExplorerHttpServer() {
+	~DashHttpServer() {
 		Stop();
 	}
 
@@ -169,9 +169,9 @@ private:
 	weak_ptr<DatabaseInstance> db_instance;
 };
 
-DuckExplorerHttpServer server;
+DashHttpServer server;
 
-inline DuckExplorerHttpServer &GetServer(ClientContext &) {
+inline DashHttpServer &GetServer(ClientContext &) {
 	return server;
 }
 

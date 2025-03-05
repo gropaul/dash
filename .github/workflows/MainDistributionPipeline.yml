@@ -22,18 +22,8 @@ jobs:
 
   duckdb-stable-build:
     name: Build extension binaries
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.1.1
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.2.0
     with:
-      duckdb_version: v1.1.1
-      ci_tools_version: v1.1.1
+      duckdb_version: v1.2.0
+      ci_tools_version: v1.2.0
       extension_name: dash
-
-  duckdb-stable-deploy:
-    name: Deploy extension binaries
-    needs: duckdb-stable-build
-    uses: ./.github/workflows/_extension_deploy.yml
-    secrets: inherit
-    with:
-      duckdb_version: v1.1.1
-      extension_name: dash
-      deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}

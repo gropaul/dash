@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
-project(duck_explorer)
+project(dash)
 
 # 1) Find Python
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Set extension name here
-set(TARGET_NAME duck_explorer)
+set(TARGET_NAME dash)
 
 if(MINGW)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
@@ -19,7 +19,7 @@ set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
 set(EXTENSION_SOURCES
-        src/duck_explorer_extension.cpp
+        src/dash_extension.cpp
         src/gen/files.cpp
         src/serializer/result_serializer.cpp
         src/temp_file.cpp
