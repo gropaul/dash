@@ -137,12 +137,14 @@ install_node_via_tarball() {
     fi
 
     echo "Portable Node installed to: $EXTRACTED_DIR"
-    echo "Add these to your PATH for usage:"
-    echo "  $EXTRACTED_DIR/bin"
+    echo "Added to PATH: $NODE_BIN"
+    # add to PATH
+    export PATH="$EXTRACTED_DIR/bin:$PATH"
 
-    # Optionally create symlinks in /usr/local/bin or similar:
-    # $SUDO ln -sf "$NODE_BIN" /usr/local/bin/node
-    # $SUDO ln -sf "$NPM_BIN" /usr/local/bin/npm
+
+#     Optionally create symlinks in /usr/local/bin or similar:
+     $SUDO ln -sf "$NODE_BIN" /usr/local/bin/node
+     $SUDO ln -sf "$NPM_BIN" /usr/local/bin/npm
 
     return 0
 }
