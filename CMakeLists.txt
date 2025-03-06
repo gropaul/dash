@@ -70,9 +70,6 @@ if (NOT NPM_EXECUTABLE)
     if (INSTALL_RESULT)
         message(FATAL_ERROR "Failed to install npm.")
     endif()
-
-    # Re-check after installing
-    find_program(NPM_EXECUTABLE NAMES npm REQUIRED)
 endif()
 
 message(STATUS "npm found: ${NPM_EXECUTABLE}")
