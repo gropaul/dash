@@ -107,12 +107,17 @@ def install_tools():
         install_dir="node_install"  # Final install location
     )
 
-    # 3) Demonstration: run npm to verify
-    result = subprocess.run([npm_path, "--version"], capture_output=True, text=True)
+    result = subprocess.run(
+        [npm_path, "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True  # or text=True if your 3.6 minor version supports it
+    )
     if result.returncode == 0:
         print("npm version:", result.stdout.strip())
     else:
         print("Failed to run npm from the new installation.")
+
 
 # test
 def build_ui():
@@ -155,8 +160,8 @@ namespace duckdb {
 const File %var_name% = {
      // Content
      %content%,    //
-     R"(%content_type%)", //
-     R"(%path%)", //
+     "%content_type%", //
+     "%path%", //
 };
 }
 """
@@ -255,7 +260,7 @@ def generate_ui_files():
 
         path = normalize_path(file.replace(base_path, ""))
 
-        path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_")
+        path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_").replace("__", "_")
         final_path = target_dir + "/" + path_as_name + ".hpp"
 
         templated = (
