@@ -21,48 +21,81 @@ def install_node_and_npm(
         install_dir="node_install"
 ):
     """
-    Downloads and unpacks a portable Node.js + npm into install_dir,
-    returning (node_path, npm_path). Works on Linux/macOS/Windows, no shell needed.
-    """
-    # Figure out which archive name to grab
-    system = platform.system().lower()     # "windows", "linux", "darwin"
-    machine = platform.machine().lower()   # e.g. "x86_64", "amd64", "arm64", etc.
+    Downloads and unpacks a portable Node.js + npm into `install_dir`,
+    returning (node_path, npm_path).
 
-    # Map machine/CPU names to Node's naming
-    # (You may need additional logic for other architectures)
+    - Works on Windows, macOS (darwin), and Linux (glibc or musl/Alpine).
+    - No shell commands are needed for extracting the archive (pure Python).
+    - If your system is Alpine Linux (musl), it will attempt to download the
+      'linux-musl-ARCH' build, which is available starting from Node 16+.
+
+    Usage example:
+        node_path, npm_path = install_node_and_npm(
+            version="v18.14.2",
+            download_dir="node_download",
+            install_dir="node_install"
+        )
+    """
+    system = platform.system().lower()       # e.g. "windows", "linux", "darwin"
+    machine = platform.machine().lower()     # e.g. "x86_64", "amd64", "arm64", etc.
+
+    # Detect CPU arch for Node's naming:
     if machine in ("x86_64", "amd64"):
         arch = "x64"
     elif "arm64" in machine or "aarch64" in machine:
         arch = "arm64"
     elif "arm" in machine:
-        # This is simplistic: Node has multiple ARM variants (armv7l, armv6l, etc.)
-        # Adjust as needed for your environment.
+        # Node has multiple ARM variants (armv6l, armv7l, etc.).
+        # Adjust as needed if you need a specific one.
         arch = "armv7l"
     else:
         raise RuntimeError(f"Unsupported CPU architecture: {machine}")
 
+    # Check if we’re on musl (Alpine) or glibc if Linux:
+    is_musl = False
+    if system == "linux":
+        try:
+            output = subprocess.check_output(["ldd", "--version"], stderr=subprocess.STDOUT, text=True)
+            if "musl" in output.lower():
+                is_musl = True
+        except Exception:
+            pass  # If we can't run ldd or parse output, assume glibc
+
     base_url = f"https://nodejs.org/dist/{version}"
 
-    # We’ll pick .tar.gz for Linux & macOS, .zip for Windows
+    # Determine which archive name to fetch:
     if system == "windows":
+        # Node for Windows is a .zip
         archive_name = f"node-{version}-win-{arch}.zip"
+
     elif system == "darwin":
+        # Node for macOS
         archive_name = f"node-{version}-darwin-{arch}.tar.gz"
-    else:  # assume Linux
-        archive_name = f"node-{version}-linux-{arch}.tar.gz"
+
+    else:
+        # system == "linux"
+        if is_musl:
+            # Alpine-based (musl)
+            # Node official builds for musl exist starting from Node 16+.
+            # e.g. "node-v18.14.2-linux-musl-x64.tar.gz"
+            archive_name = f"node-{version}-linux-musl-{arch}.tar.gz"
+        else:
+            # glibc-based Linux
+            archive_name = f"node-{version}-linux-{arch}.tar.gz"
 
     download_url = f"{base_url}/{archive_name}"
     local_archive = os.path.join(download_dir, archive_name)
 
+    # Create directories if needed
     os.makedirs(download_dir, exist_ok=True)
     os.makedirs(install_dir, exist_ok=True)
 
-    # 1) Download the archive (no shell commands, just urllib)
+    # 1) Download the archive
     print(f"Downloading {download_url} ...")
     with urllib.request.urlopen(download_url) as response:
         data = response.read()
 
-    # 2) Save archive locally just in case
+    # 2) Save archive locally
     with open(local_archive, "wb") as f:
         f.write(data)
 
@@ -71,19 +104,25 @@ def install_node_and_npm(
     if system == "windows":
         with zipfile.ZipFile(local_archive, "r") as zf:
             zf.extractall(install_dir)
+
+        # Windows folder name (e.g. "node-v18.14.2-win-x64")
         extracted_folder_name = f"node-{version}-win-{arch}"
-        # On Windows, Node and npm are at the top level within that folder.
         node_executable = os.path.join(install_dir, extracted_folder_name, "node.exe")
         npm_executable  = os.path.join(install_dir, extracted_folder_name, "npm.cmd")
+
     else:
+        # macOS or Linux
         with tarfile.open(local_archive, "r:gz") as tf:
             tf.extractall(path=install_dir)
-        extracted_folder_name = (
-                f"node-{version}-" + ("linux" if system == "linux" else "darwin") + f"-{arch}"
-        )
+
+        # Example: node-v18.14.2-linux-x64, node-v18.14.2-linux-musl-x64, node-v18.14.2-darwin-x64
+        subdir_system = "linux-musl" if (is_musl and system == "linux") else system
+        extracted_folder_name = f"node-{version}-{subdir_system}-{arch}"
+
         node_executable = os.path.join(install_dir, extracted_folder_name, "bin", "node")
         npm_executable  = os.path.join(install_dir, extracted_folder_name, "bin", "npm")
 
+    # 4) Validate
     if not os.path.exists(node_executable):
         raise RuntimeError(f"Node binary not found at {node_executable}")
     if not os.path.exists(npm_executable):
@@ -93,6 +132,7 @@ def install_node_and_npm(
     print(f"npm installed to:  {npm_executable}")
 
     return node_executable, npm_executable
+
 
 def install_tools():
     # 1) Check if npm is already installed
