@@ -141,6 +141,22 @@ install_node_via_tarball() {
     # add to PATH
     export PATH="$EXTRACTED_DIR/bin:$PATH"
 
+    echo "Verify extracted Node.js installation..."
+    if ! "$NODE_BIN" --version; then
+        echo "Node.js not found or failed to run."
+        return 1
+    fi
+
+    echo "Verifying npm installation..."
+    if ! npm --version; then
+        echo "npm not found or failed to run."
+        exit 1  # Use exit if this is a standalone script
+    fi
+
+    echo "Node.js and npm installed successfully."
+
+
+
 
 #     Optionally create symlinks in /usr/local/bin or similar:
      $SUDO ln -sf "$NODE_BIN" /usr/local/bin/node
