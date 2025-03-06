@@ -152,11 +152,11 @@ CONTENT_TEMPLATE = """
 #pragma once
 #include "files.hpp"
 namespace duckdb {
-File %var_name% = {
+const File %var_name% = {
      // Content
      %content%,    //
-     R"DELIM(%content_type%)DELIM", //
-     R"DELIM(%path%)DELIM", //
+     R"(%content_type%)", //
+     R"(%path%)", //
 };
 }
 """
@@ -205,7 +205,6 @@ optional_ptr<File> GetFile(Path path, const bool try_resolve_404) {
 def normalize_path(path: str) -> str:
     path = f"/{path}/"
     return path.replace("//", "/")
-
 
 def get_content_type(file: str) -> str:
     content_types = {
@@ -256,7 +255,7 @@ def generate_ui_files():
 
         path = normalize_path(file.replace(base_path, ""))
 
-        path_as_name = path.replace("/", "_").replace(".", "_").replace("-", "_")
+        path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_")
         final_path = target_dir + "/" + path_as_name + ".hpp"
 
         templated = (

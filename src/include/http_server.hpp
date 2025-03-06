@@ -14,6 +14,28 @@
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
+#include <cstdlib>
+#include <string>
+
+static bool tryCommand(const std::string& command) {
+	// system(...) returns -1 on error; return code depends on shell command success
+	// Here we just assume 0 is success, anything else is failure
+	return (std::system(command.c_str()) == 0);
+}
+
+static void openURL(const std::string& url) {
+	// Try xdg-open first
+	if (tryCommand("xdg-open \"" + url + "\" 2>/dev/null")) {
+		return;
+	}
+	// Try open (macOS)
+	if (tryCommand("open \"" + url + "\" 2>/dev/null")) {
+		return;
+	}
+	// Finally try start (Windows)
+	// The 2> redirection won't work on Windows cmd, but won't break either
+	tryCommand("start \"" + url + "\" 2>nul");
+}
 
 class DashHttpServer {
 public:
