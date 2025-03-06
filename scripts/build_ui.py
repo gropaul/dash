@@ -260,7 +260,9 @@ def generate_ui_files():
 
         path = normalize_path(file.replace(base_path, ""))
 
-        path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_").replace("__", "_")
+        # on windows: replace \ with \\ to avoid escape sequences
+        path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_").replace("__", "_").replace("\\", "\\\\")
+
         final_path = target_dir + "/" + path_as_name + ".hpp"
 
         templated = (
