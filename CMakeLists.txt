@@ -34,6 +34,49 @@ endif()
 message(STATUS "Python found: ${Python3_EXECUTABLE}")
 
 
+# 1) Find npm
+find_program(NPM_EXECUTABLE NAMES npm)
+
+if (NOT NPM_EXECUTABLE)
+    message(STATUS "npm not found, trying to install it...")
+    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
+
+    if (WIN32)
+        set(SCRIPT_NAME "install_npm_windows.bat")
+        # On Windows, we typically run batch files via `cmd /c`
+        execute_process(
+                COMMAND cmd /c "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+                RESULT_VARIABLE INSTALL_RESULT
+        )
+    elseif (APPLE)
+        set(SCRIPT_NAME "install_npm_mac.sh")
+        execute_process(
+                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+                RESULT_VARIABLE INSTALL_RESULT
+        )
+    elseif (UNIX)
+        set(SCRIPT_NAME "install_npm_linux.sh")
+        execute_process(
+                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+                RESULT_VARIABLE INSTALL_RESULT
+        )
+    else()
+        message(FATAL_ERROR "Unsupported platform.")
+    endif()
+
+    if (INSTALL_RESULT)
+        message(FATAL_ERROR "Failed to install npm.")
+    endif()
+
+    # Re-check after installing
+    find_program(NPM_EXECUTABLE NAMES npm REQUIRED)
+endif()
+
+message(STATUS "npm found: ${NPM_EXECUTABLE}")
+
 # 2) Add a custom target that runs your Python script
 # The `ALL` ensures the script will run whenever you type `make`
 # (or build the default target).

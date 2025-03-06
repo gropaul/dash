@@ -84,6 +84,7 @@ def install_node_and_npm(
             archive_name = f"node-{version}-linux-{arch}.tar.gz"
 
     download_url = f"{base_url}/{archive_name}"
+    print(f"Downloading Node.js from: {download_url}")
     local_archive = os.path.join(download_dir, archive_name)
 
     # Create directories if needed
