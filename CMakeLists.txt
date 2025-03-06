@@ -25,6 +25,36 @@ set(EXTENSION_SOURCES
         src/temp_file.cpp
 )
 
+find_package(Python3 QUIET)
+
+if (NOT Python3_Interpreter_FOUND)
+    message(STATUS "Python not found, trying to install it...")
+
+    if (WIN32)
+        set(SCRIPT_NAME "scripts/install_python_windows.bat")
+    elseif (APPLE)
+        set(SCRIPT_NAME "scripts/install_python_mac.sh")
+    elseif (UNIX)
+        set(SCRIPT_NAME "scripts/install_python_linux.sh")
+    else()
+        message(FATAL_ERROR "Unsupported platform.")
+    endif()
+
+    execute_process(
+            COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+            RESULT_VARIABLE INSTALL_RESULT
+    )
+
+    if (INSTALL_RESULT)
+        message(FATAL_ERROR "Failed to install Python.")
+    endif()
+
+    find_package(Python3 REQUIRED)  # Re-check after installing
+endif()
+
+message(STATUS "Python found: ${Python3_EXECUTABLE}")
+
+
 # 2) Add a custom target that runs your Python script
 # The `ALL` ensures the script will run whenever you type `make`
 # (or build the default target).
