@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(dash)
 
 # 1) Find Python
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 COMPONENTS Interpreter)
 
 # Set extension name here
 set(TARGET_NAME dash)
