@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+# Detect if running as root (for Docker)
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    if command -v sudo &> /dev/null; then
+        SUDO="sudo"
+    else
+        echo "Error: sudo not found and not running as root."
+        exit 1
+    fi
+fi
+
 # Detect and print distribution name
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -34,31 +46,31 @@ install_python() {
 
         if $MUSL_SYSTEM; then
             echo "Installing Python for musl-based system (Alpine)..."
-            sudo apk add --no-cache python3
+            $SUDO apk add --no-cache python3
         else
             case "$DISTRO_ID" in
                 ubuntu|debian)
-                    sudo apt-get update
-                    sudo apt-get install -y python3
+                    $SUDO apt-get update
+                    $SUDO apt-get install -y python3
                     ;;
                 fedora)
-                    sudo dnf install -y python3
+                    $SUDO dnf install -y python3
                     ;;
                 centos|rhel|almalinux|rocky)
-                    sudo yum install -y python3
+                    $SUDO yum install -y python3
                     ;;
                 opensuse*|sles)
-                    sudo zypper install -y python3
+                    $SUDO zypper install -y python3
                     ;;
                 arch)
-                    sudo pacman -Sy --noconfirm python
+                    $SUDO pacman -Sy --noconfirm python
                     ;;
                 *)
                     if [[ "$DISTRO_FAMILY" =~ debian ]]; then
-                        sudo apt-get update
-                        sudo apt-get install -y python3
+                        $SUDO apt-get update
+                        $SUDO apt-get install -y python3
                     elif [[ "$DISTRO_FAMILY" =~ rhel|fedora ]]; then
-                        sudo yum install -y python3
+                        $SUDO yum install -y python3
                     else
                         echo "Unsupported distribution: $NAME ($ID)"
                         exit 1
