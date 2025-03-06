@@ -163,6 +163,12 @@ def install_tools():
     print("Checking npm version at", npm_path)
     check_command_version("npm", npm_path)
 
+    # add npm to PATH
+    os.environ["PATH"] += os.pathsep + os.path.dirname(npm_path)
+
+    # check if npm is installed
+    if not is_npm_installed():
+        raise RuntimeError("npm is not installed or not on PATH")
 
 
 

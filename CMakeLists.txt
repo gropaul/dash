@@ -34,24 +34,15 @@ endif()
 message(STATUS "Python found: ${Python3_EXECUTABLE}")
 
 
-## 2) Add a custom target that runs your Python script
-## The `ALL` ensures the script will run whenever you type `make`
-## (or build the default target).
-#add_custom_target(
-#        run_my_python_script ALL
-#        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_ui.py
-#        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}  # or wherever you need to run
-#        COMMENT "Running Python script to build UI"
-#)
-
-add_custom_command(
-        TARGET my_main_target  # Replace with your real target
-        PRE_BUILD
+# 2) Add a custom target that runs your Python script
+# The `ALL` ensures the script will run whenever you type `make`
+# (or build the default target).
+add_custom_target(
+        run_my_python_script ALL
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_ui.py
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Running Python script to build UI before building main target"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}  # or wherever you need to run
+        COMMENT "Running Python script to build UI"
 )
-
 
 # Set extension name here
 set(TARGET_NAME dash)
