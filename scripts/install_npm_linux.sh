@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Detect if running as root (for Docker)
+# Detect if running as root
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 else
@@ -39,101 +39,130 @@ else
     MUSL_SYSTEM=false
 fi
 
-NODE_VERSION="18.14.2"
+install_node_18_nodesource() {
+    # Attempt NodeSource 18.x
+    if [[ "$DISTRO_ID" =~ ubuntu|debian ]]; then
+        $SUDO apt-get update
+        $SUDO apt-get install -y curl ca-certificates
+        curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash - || return 1
+        $SUDO apt-get install -y nodejs || return 1
+    elif [[ "$DISTRO_ID" =~ fedora ]]; then
+        $SUDO dnf install -y curl
+        curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash - || return 1
+        $SUDO dnf install -y nodejs || return 1
+    elif [[ "$DISTRO_ID" =~ centos|rhel|almalinux|rocky ]]; then
+        $SUDO yum install -y curl
+        curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash - || return 1
+        $SUDO yum install -y nodejs || return 1
+    else
+        return 1  # Means "we don’t know how to handle $DISTRO_ID here"
+    fi
+}
 
-install_node_18() {
-    echo "Installing Node.js $NODE_VERSION or newer..."
+install_node_16_nodesource() {
+    # Attempt NodeSource 16.x
+    if [[ "$DISTRO_ID" =~ ubuntu|debian ]]; then
+        $SUDO apt-get update
+        $SUDO apt-get install -y curl ca-certificates
+        curl -fsSL https://deb.nodesource.com/setup_16.x | $SUDO bash - || return 1
+        $SUDO apt-get install -y nodejs || return 1
+    elif [[ "$DISTRO_ID" =~ fedora ]]; then
+        $SUDO dnf install -y curl
+        curl -fsSL https://rpm.nodesource.com/setup_16.x | $SUDO bash - || return 1
+        $SUDO dnf install -y nodejs || return 1
+    elif [[ "$DISTRO_ID" =~ centos|rhel|almalinux|rocky ]]; then
+        $SUDO yum install -y curl
+        curl -fsSL https://rpm.nodesource.com/setup_16.x | $SUDO bash - || return 1
+        $SUDO yum install -y nodejs || return 1
+    else
+        return 1
+    fi
+}
 
+install_node_via_system_repos() {
+    # Fallback to system repositories (likely older)
     if $MUSL_SYSTEM; then
-        # Alpine uses separate 'community' repositories or 'edge' for current Node.
-        # 'nodejs-current' package typically points to the latest stable Node branch.
-        echo "Installing Node.js >= $NODE_VERSION on Alpine..."
+        # Alpine
         $SUDO apk update
-        # If the Alpine base doesn't have nodejs-current, you may need to enable community repo:
-        # $SUDO apk add --no-cache nodejs-current npm
-        # Some Alpine versions ship an older nodejs package. For actual guaranteed 18.x,
-        # you may need to manually download from nodejs.org or use a tarball.
-        $SUDO apk add --no-cache nodejs npm
+        $SUDO apk add --no-cache nodejs npm || return 1
     else
         case "$DISTRO_ID" in
             ubuntu|debian)
-                # Use NodeSource setup_18.x script to ensure we get Node >= 18.x
                 $SUDO apt-get update
-                $SUDO apt-get install -y curl ca-certificates
-                curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash -
-                $SUDO apt-get install -y nodejs
+                $SUDO apt-get install -y nodejs npm || return 1
                 ;;
             fedora)
-                $SUDO dnf install -y curl
-                curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
-                $SUDO dnf install -y nodejs
+                $SUDO dnf install -y nodejs npm || return 1
                 ;;
             centos|rhel|almalinux|rocky)
-                $SUDO yum install -y curl
-                curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
-                $SUDO yum install -y nodejs
+                $SUDO yum install -y nodejs npm || return 1
                 ;;
             opensuse*|sles)
-                # openSUSE Tumbleweed typically has newer Node in main repos:
-                echo "Installing Node.js >= $NODE_VERSION on openSUSE/SLES..."
                 $SUDO zypper refresh
-                $SUDO zypper install -y nodejs18 npm18 || {
-                    echo "Attempted nodejs18/npm18 from the official repos."
-                    echo "If that fails, consider a manual NodeSource or manual install approach."
-                    exit 1
-                }
+                $SUDO zypper install -y nodejs npm || return 1
                 ;;
             arch)
-                # Arch generally has very recent packages
-                echo "Installing Node.js >= $NODE_VERSION on Arch..."
-                $SUDO pacman -Sy --noconfirm nodejs npm
+                $SUDO pacman -Sy --noconfirm nodejs npm || return 1
                 ;;
             *)
                 # If ID_LIKE can help us guess
                 if [[ "$DISTRO_FAMILY" =~ debian ]]; then
                     $SUDO apt-get update
-                    $SUDO apt-get install -y curl ca-certificates
-                    curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash -
-                    $SUDO apt-get install -y nodejs
+                    $SUDO apt-get install -y nodejs npm || return 1
                 elif [[ "$DISTRO_FAMILY" =~ rhel|fedora ]]; then
-                    $SUDO yum install -y curl
-                    curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
-                    $SUDO yum install -y nodejs
+                    $SUDO yum install -y nodejs npm || return 1
                 else
-                    echo "Unsupported distribution: $NAME ($ID)"
-                    exit 1
+                    return 1
                 fi
                 ;;
         esac
     fi
 }
 
-# Check if npm exists, and if node is >= 18.14.2
-if command -v node &>/dev/null && command -v npm &>/dev/null; then
-    # Extract just the numeric version (e.g., "18.14.2") from something like "v18.14.2"
-    INSTALLED_VERSION="$(node -v | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
-    if [ -z "$INSTALLED_VERSION" ]; then
-        echo "Node found, but version check failed. Reinstalling Node >= $NODE_VERSION."
-        install_node_18
+check_or_install_node() {
+    echo "Trying NodeSource for Node >= 18..."
+    if install_node_18_nodesource; then
+        echo "Node 18.x installation successful."
+        return 0
     else
-        # Compare versions using sort -V
-        MIN_VERSION="$NODE_VERSION"
-        LOWER_VERSION="$(printf '%s\n' "$MIN_VERSION" "$INSTALLED_VERSION" | sort -V | head -n1)"
-
-        if [ "$LOWER_VERSION" = "$MIN_VERSION" ] && [ "$INSTALLED_VERSION" != "$MIN_VERSION" ]; then
-            # If the installed version is strictly greater than MIN_VERSION, it's fine
-            # If it's equal, also fine. Only reinstall if installed < required
-            echo "Installed Node.js is $INSTALLED_VERSION, which is >= $NODE_VERSION."
-            echo "No installation needed."
+        echo "Node 18.x installation failed. Trying Node 16.x..."
+        if install_node_16_nodesource; then
+            echo "Node 16.x installation successful."
+            return 0
         else
-            echo "Installed Node.js version is $INSTALLED_VERSION, which is less than $NODE_VERSION."
-            echo "Reinstalling to get Node.js >= $NODE_VERSION."
-            install_node_18
+            echo "Node 16.x installation failed. Falling back to system repos..."
+            if install_node_via_system_repos; then
+                echo "Installed Node from system repos."
+                return 0
+            else
+                echo "All attempts to install Node.js have failed."
+                return 1
+            fi
         fi
     fi
-else
-    echo "npm (or node) not found. Installing Node.js >= $NODE_VERSION..."
-    install_node_18
-fi
+}
 
-echo "Done!"
+# If node is installed, check if it's >= 18.14.2. Otherwise, run fallback logic:
+REQUIRED_NODE_VERSION="18.14.2"
+if command -v node >/dev/null 2>&1; then
+    CURRENT_NODE_VERSION="$(node -v 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
+    if [ -n "$CURRENT_NODE_VERSION" ]; then
+        # Compare versions with sort -V
+        LOWEST="$(printf '%s\n' "$REQUIRED_NODE_VERSION" "$CURRENT_NODE_VERSION" | sort -V | head -n1)"
+        if [ "$LOWEST" = "$REQUIRED_NODE_VERSION" ] && [ "$CURRENT_NODE_VERSION" != "$REQUIRED_NODE_VERSION" ]; then
+            echo "Detected Node.js $CURRENT_NODE_VERSION which is >= $REQUIRED_NODE_VERSION."
+            echo "No new installation needed."
+            exit 0
+        else
+            echo "Detected Node.js $CURRENT_NODE_VERSION which is < $REQUIRED_NODE_VERSION."
+            echo "Attempting to install newer or fallback Node."
+            check_or_install_node
+        fi
+    else
+        echo "Node found, but version could not be parsed. Reinstalling."
+        check_or_install_node
+    fi
+else
+    echo "No node found. Attempting to install Node >= $REQUIRED_NODE_VERSION or fallback..."
+    check_or_install_node
+fi
