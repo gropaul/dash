@@ -116,7 +116,7 @@ def install_tools():
     if result.returncode == 0:
         print("npm version:", result.stdout.strip())
     else:
-        print("Failed to run npm from the new installation.")
+        print("Failed to run npm from the new installation: " + result.stderr)
 
 
 # test
