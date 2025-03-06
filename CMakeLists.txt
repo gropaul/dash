@@ -28,7 +28,9 @@ set(EXTENSION_SOURCES
 find_package(Python3 QUIET)
 
 if (NOT Python3_Interpreter_FOUND)
+    # print the current directory
     message(STATUS "Python not found, trying to install it...")
+    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
 
     if (WIN32)
         set(SCRIPT_NAME "install_python_windows.bat")
