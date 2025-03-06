@@ -39,55 +39,101 @@ else
     MUSL_SYSTEM=false
 fi
 
-# Function to install npm (and Node.js if needed)
-install_npm() {
-    if ! command -v npm &> /dev/null; then
-        echo "npm not found. Installing via package manager..."
+NODE_VERSION="18.14.2"
 
-        if $MUSL_SYSTEM; then
-            echo "Installing npm for musl-based system (Alpine)..."
-            $SUDO apk update
-            # Typically nodejs and npm are separate packages in Alpine
-            $SUDO apk add --no-cache nodejs npm
-        else
-            case "$DISTRO_ID" in
-                ubuntu|debian)
-                    $SUDO apt-get update
-                    $SUDO apt-get install -y nodejs npm
-                    ;;
-                fedora)
-                    $SUDO dnf install -y nodejs npm
-                    ;;
-                centos|rhel|almalinux|rocky)
-                    # CentOS/RHEL often come with older Node.js in default repos.
-                    # For newer versions, users might prefer NodeSource or EPEL repos,
-                    # but here we do the simplest approach:
-                    $SUDO yum install -y nodejs npm
-                    ;;
-                opensuse*|sles)
-                    $SUDO zypper refresh
-                    $SUDO zypper install -y nodejs npm
-                    ;;
-                arch)
-                    $SUDO pacman -Sy --noconfirm nodejs npm
-                    ;;
-                *)
-                    # Fallback for distros using the ID_LIKE approach
-                    if [[ "$DISTRO_FAMILY" =~ debian ]]; then
-                        $SUDO apt-get update
-                        $SUDO apt-get install -y nodejs npm
-                    elif [[ "$DISTRO_FAMILY" =~ rhel|fedora ]]; then
-                        $SUDO yum install -y nodejs npm
-                    else
-                        echo "Unsupported distribution: $NAME ($ID)"
-                        exit 1
-                    fi
-                    ;;
-            esac
-        fi
+install_node_18() {
+    echo "Installing Node.js $NODE_VERSION or newer..."
+
+    if $MUSL_SYSTEM; then
+        # Alpine uses separate 'community' repositories or 'edge' for current Node.
+        # 'nodejs-current' package typically points to the latest stable Node branch.
+        echo "Installing Node.js >= $NODE_VERSION on Alpine..."
+        $SUDO apk update
+        # If the Alpine base doesn't have nodejs-current, you may need to enable community repo:
+        # $SUDO apk add --no-cache nodejs-current npm
+        # Some Alpine versions ship an older nodejs package. For actual guaranteed 18.x,
+        # you may need to manually download from nodejs.org or use a tarball.
+        $SUDO apk add --no-cache nodejs npm
     else
-        echo "npm is already installed."
+        case "$DISTRO_ID" in
+            ubuntu|debian)
+                # Use NodeSource setup_18.x script to ensure we get Node >= 18.x
+                $SUDO apt-get update
+                $SUDO apt-get install -y curl ca-certificates
+                curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash -
+                $SUDO apt-get install -y nodejs
+                ;;
+            fedora)
+                $SUDO dnf install -y curl
+                curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
+                $SUDO dnf install -y nodejs
+                ;;
+            centos|rhel|almalinux|rocky)
+                $SUDO yum install -y curl
+                curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
+                $SUDO yum install -y nodejs
+                ;;
+            opensuse*|sles)
+                # openSUSE Tumbleweed typically has newer Node in main repos:
+                echo "Installing Node.js >= $NODE_VERSION on openSUSE/SLES..."
+                $SUDO zypper refresh
+                $SUDO zypper install -y nodejs18 npm18 || {
+                    echo "Attempted nodejs18/npm18 from the official repos."
+                    echo "If that fails, consider a manual NodeSource or manual install approach."
+                    exit 1
+                }
+                ;;
+            arch)
+                # Arch generally has very recent packages
+                echo "Installing Node.js >= $NODE_VERSION on Arch..."
+                $SUDO pacman -Sy --noconfirm nodejs npm
+                ;;
+            *)
+                # If ID_LIKE can help us guess
+                if [[ "$DISTRO_FAMILY" =~ debian ]]; then
+                    $SUDO apt-get update
+                    $SUDO apt-get install -y curl ca-certificates
+                    curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash -
+                    $SUDO apt-get install -y nodejs
+                elif [[ "$DISTRO_FAMILY" =~ rhel|fedora ]]; then
+                    $SUDO yum install -y curl
+                    curl -fsSL https://rpm.nodesource.com/setup_18.x | $SUDO bash -
+                    $SUDO yum install -y nodejs
+                else
+                    echo "Unsupported distribution: $NAME ($ID)"
+                    exit 1
+                fi
+                ;;
+        esac
     fi
 }
 
-install_npm
+# Check if npm exists, and if node is >= 18.14.2
+if command -v node &>/dev/null && command -v npm &>/dev/null; then
+    # Extract just the numeric version (e.g., "18.14.2") from something like "v18.14.2"
+    INSTALLED_VERSION="$(node -v | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
+    if [ -z "$INSTALLED_VERSION" ]; then
+        echo "Node found, but version check failed. Reinstalling Node >= $NODE_VERSION."
+        install_node_18
+    else
+        # Compare versions using sort -V
+        MIN_VERSION="$NODE_VERSION"
+        LOWER_VERSION="$(printf '%s\n' "$MIN_VERSION" "$INSTALLED_VERSION" | sort -V | head -n1)"
+
+        if [ "$LOWER_VERSION" = "$MIN_VERSION" ] && [ "$INSTALLED_VERSION" != "$MIN_VERSION" ]; then
+            # If the installed version is strictly greater than MIN_VERSION, it's fine
+            # If it's equal, also fine. Only reinstall if installed < required
+            echo "Installed Node.js is $INSTALLED_VERSION, which is >= $NODE_VERSION."
+            echo "No installation needed."
+        else
+            echo "Installed Node.js version is $INSTALLED_VERSION, which is less than $NODE_VERSION."
+            echo "Reinstalling to get Node.js >= $NODE_VERSION."
+            install_node_18
+        fi
+    fi
+else
+    echo "npm (or node) not found. Installing Node.js >= $NODE_VERSION..."
+    install_node_18
+fi
+
+echo "Done!"
