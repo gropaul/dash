@@ -134,6 +134,15 @@ def install_node_and_npm(
     return node_executable, npm_executable
 
 
+def check_command_version(command, path):
+    try:
+        print(f"Checking {command} version at {path}")
+        subprocess.run([path, "--version"], check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to check {command} version at {path}. Error: {e}")
+    except FileNotFoundError:
+        raise RuntimeError(f"{command} not found at {path}")
+
 def install_tools():
     # 1) Check if npm is already installed
     if is_npm_installed():
@@ -147,16 +156,14 @@ def install_tools():
         install_dir="node_install"  # Final install location
     )
 
-    result = subprocess.run(
-        [npm_path, "--version"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True  # or text=True if your 3.6 minor version supports it
-    )
-    if result.returncode == 0:
-        print("npm version:", result.stdout.strip())
-    else:
-        print("Failed to run npm from the new installation: " + result.stderr)
+    # check if npm is installed
+    print("Checking Node.js version at", node_path)
+    check_command_version("Node.js", node_path)
+
+    print("Checking npm version at", npm_path)
+    check_command_version("npm", npm_path)
+
+
 
 
 # test
