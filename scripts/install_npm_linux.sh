@@ -1,11 +1,20 @@
 #!/bin/bash
 set -e
 
-# Detect if running as root
+# -------------------------
+# Configuration
+# -------------------------
+NODE_VERSION="v18.14.2"        # Which Node version to download from nodejs.org
+INSTALL_DIR="./node_install"   # Where to extract the portable Node
+DOWNLOAD_DIR="./node_download" # Where to save the tarball before extraction
+
+# ----------------------------------------------------
+# 0) Root check & distribution detection
+# ----------------------------------------------------
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 else
-    if command -v sudo &> /dev/null; then
+    if command -v sudo &>/dev/null; then
         SUDO="sudo"
     else
         echo "Error: sudo not found and not running as root."
@@ -13,7 +22,7 @@ else
     fi
 fi
 
-# Detect and print distribution name
+# OS release
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     echo "Detected distribution: $NAME ($ID)"
@@ -27,7 +36,7 @@ elif [ -f /etc/redhat-release ]; then
     DISTRO_ID="rhel"
 else
     echo "Could not detect Linux distribution."
-    exit 1
+    DISTRO_ID="unknown"
 fi
 
 # Check if musl or glibc
@@ -39,9 +48,108 @@ else
     MUSL_SYSTEM=false
 fi
 
-##############################################
-# Attempt installing Node 18.x (and npm) via NodeSource
-##############################################
+# ----------------------------------------------------
+# 1) Attempt portable tarball install from nodejs.org
+# ----------------------------------------------------
+install_node_via_tarball() {
+    echo "Attempting to install Node.js $NODE_VERSION via official tarball..."
+    # Dependencies: tar, curl (or wget). We'll assume tar is present; we can ensure curl below.
+
+    # Install curl if missing (on Debian/Ubuntu)
+    if ! command -v curl &>/dev/null; then
+        if [[ "$DISTRO_ID" =~ ubuntu|debian ]]; then
+            $SUDO apt-get update
+            $SUDO apt-get install -y curl
+        elif [[ "$DISTRO_ID" =~ fedora ]]; then
+            $SUDO dnf install -y curl
+        elif [[ "$DISTRO_ID" =~ centos|rhel|almalinux|rocky ]]; then
+            $SUDO yum install -y curl
+        elif [ "$DISTRO_ID" = "arch" ]; then
+            $SUDO pacman -Sy --noconfirm curl
+        elif [ "$DISTRO_ID" = "opensuse" ] || [[ "$DISTRO_ID" =~ sles ]]; then
+            $SUDO zypper refresh
+            $SUDO zypper install -y curl
+        elif $MUSL_SYSTEM; then
+            $SUDO apk update
+            $SUDO apk add curl
+        fi
+    fi
+
+    # Architecture detection
+    MACHINE="$(uname -m | tr '[:upper:]' '[:lower:]')" # e.g. x86_64, aarch64
+    case "$MACHINE" in
+        x86_64|amd64)
+            ARCH="x64"
+            ;;
+        *arm64*|*aarch64*)
+            ARCH="arm64"
+            ;;
+        *armv7l*|*armv6l*)
+            # Node has specific builds for armv7l, armv6l, etc.
+            # We'll guess armv7l for 32-bit ARM:
+            ARCH="armv7l"
+            ;;
+        *)
+            echo "Unsupported architecture: $MACHINE"
+            return 1
+            ;;
+    esac
+
+    # If Linux, determine musl vs. glibc in the tarball name
+    UNAME_SYS="$(uname | tr '[:upper:]' '[:lower:]')" # "linux" or "darwin"
+    if [ "$UNAME_SYS" = "linux" ]; then
+        if $MUSL_SYSTEM; then
+            # Node official musl builds exist for Node >=16 on x64 & arm64
+            TARBALL_OS="linux-musl"
+        else
+            TARBALL_OS="linux"
+        fi
+    elif [ "$UNAME_SYS" = "darwin" ]; then
+        TARBALL_OS="darwin"
+    else
+        echo "This script currently supports Linux or Darwin (macOS) only."
+        return 1
+    fi
+
+    TARBALL_BASENAME="node-$NODE_VERSION-$TARBALL_OS-$ARCH"
+    TARBALL_FILE="$TARBALL_BASENAME.tar.gz"
+    DOWNLOAD_URL="https://nodejs.org/dist/$NODE_VERSION/$TARBALL_FILE"
+
+    mkdir -p "$DOWNLOAD_DIR" "$INSTALL_DIR"
+
+    echo "Downloading $DOWNLOAD_URL ..."
+    if ! curl -fSL "$DOWNLOAD_URL" -o "$DOWNLOAD_DIR/$TARBALL_FILE"; then
+        echo "Failed to download $DOWNLOAD_URL"
+        return 1
+    fi
+
+    echo "Extracting Node.js to $INSTALL_DIR ..."
+    tar -xf "$DOWNLOAD_DIR/$TARBALL_FILE" -C "$INSTALL_DIR"
+
+    # Our extracted folder will be: $INSTALL_DIR/node-v18.14.2-linux-x64, for example
+    EXTRACTED_DIR="$INSTALL_DIR/$TARBALL_BASENAME"
+    NODE_BIN="$EXTRACTED_DIR/bin/node"
+    NPM_BIN="$EXTRACTED_DIR/bin/npm"
+
+    if [ ! -x "$NODE_BIN" ] || [ ! -x "$NPM_BIN" ]; then
+        echo "Missing node or npm in $EXTRACTED_DIR"
+        return 1
+    fi
+
+    echo "Portable Node installed to: $EXTRACTED_DIR"
+    echo "Add these to your PATH for usage:"
+    echo "  $EXTRACTED_DIR/bin"
+
+    # Optionally create symlinks in /usr/local/bin or similar:
+    # $SUDO ln -sf "$NODE_BIN" /usr/local/bin/node
+    # $SUDO ln -sf "$NPM_BIN" /usr/local/bin/npm
+
+    return 0
+}
+
+# ----------------------------------------------------
+# 2) NodeSource (Node 18.x) as a fallback
+# ----------------------------------------------------
 install_node18_nodesource() {
     echo "Attempting to install Node.js 18.x from NodeSource..."
 
@@ -54,7 +162,6 @@ install_node18_nodesource() {
         ubuntu|debian)
             $SUDO apt-get update
             $SUDO apt-get install -y curl ca-certificates
-            # Pipe the NodeSource setup script
             if ! curl -fsSL https://deb.nodesource.com/setup_18.x | $SUDO bash -; then
                 return 1
             fi
@@ -84,7 +191,6 @@ install_node18_nodesource() {
             return 1
             ;;
         *)
-            # If ID_LIKE can help us
             if [[ "$DISTRO_FAMILY" =~ debian ]]; then
                 $SUDO apt-get update
                 $SUDO apt-get install -y curl ca-certificates
@@ -105,15 +211,13 @@ install_node18_nodesource() {
             ;;
     esac
 
-    # If everything above succeeds, we return 0
     echo "Successfully installed Node.js 18.x from NodeSource."
     return 0
 }
 
-##############################################
-# Fallback: Install Node.js (and npm) via system repos
-# (Likely older version, but usually guaranteed to work)
-##############################################
+# ----------------------------------------------------
+# 3) Fallback: System repos (older Node)
+# ----------------------------------------------------
 install_node_from_system() {
     echo "Falling back to installing Node.js/npm from system repos..."
     if $MUSL_SYSTEM; then
@@ -140,7 +244,6 @@ install_node_from_system() {
                 $SUDO pacman -Sy --noconfirm nodejs npm
                 ;;
             *)
-                # Fallback for ID_LIKE
                 if [[ "$DISTRO_FAMILY" =~ debian ]]; then
                     $SUDO apt-get update
                     $SUDO apt-get install -y nodejs npm
@@ -156,23 +259,28 @@ install_node_from_system() {
     echo "Installed Node.js/npm from system repositories."
 }
 
-##############################################
-# Main function to ensure npm is installed
-##############################################
+# ----------------------------------------------------
+# 4) Main logic
+# ----------------------------------------------------
 install_npm() {
+    # If npm is already on PATH, do nothing
     if command -v npm &>/dev/null; then
         echo "npm is already installed."
         return
     fi
 
-    echo "npm not found. Attempting Node 18 from NodeSource first..."
+    echo "npm not found. Trying portable tarball method first..."
 
-    if install_node18_nodesource; then
-        # Node 18 install succeeded
-        :
+    if install_node_via_tarball; then
+        echo "Installed Node.js via tarball. Done."
     else
-        echo "NodeSource install failed or not supported. Installing from system repos..."
-        install_node_from_system
+        echo "Tarball install failed or is unsupported. Attempting NodeSource next..."
+        if install_node18_nodesource; then
+            echo "Installed Node.js via NodeSource. Done."
+        else
+            echo "NodeSource failed or unsupported. Installing from system repos..."
+            install_node_from_system
+        fi
     fi
 }
 
