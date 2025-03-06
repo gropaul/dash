@@ -155,8 +155,8 @@ namespace duckdb {
 File %var_name% = {
      // Content
      %content%,    //
-     R"__(%content_type%)__", //
-     R"__(%path%)__", //
+     R"DELIM(%content_type%)DELIM", //
+     R"DELIM(%path%)DELIM", //
 };
 }
 """

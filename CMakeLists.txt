@@ -43,7 +43,7 @@ if (NOT Python3_Interpreter_FOUND)
     endif()
 
     execute_process(
-            COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+            COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
             RESULT_VARIABLE INSTALL_RESULT
     )
 
