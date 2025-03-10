@@ -1,0 +1,21 @@
+# name: test/sql/file_utils.test
+# description: test hostfs extension file utils
+# group: [hostfs]
+
+require dash
+
+statement ok
+LOAD httpfs;
+
+query I
+CALL start_dash('127.0.0.1', 4200);
+----
+true
+
+statement ok
+SELECT * FROM read_text('http://127.0.0.1:4200/?api=http&k=%25%17%00Zvq')
+
+query I
+CALL stop_dash()
+----
+true

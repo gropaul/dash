@@ -86,7 +86,9 @@ public:
 			auto encrypted_api_key = XorEncrypt(data.api_key, encryption_key);
 			user_click_url += "&k=" + StringUtil::URLEncode(encrypted_api_key);
 		}
-		openURL(user_click_url);
+		if (data.open_browser) {
+			openURL(user_click_url);
+		}
 		Printer::Print("Starting server on " + user_click_url);
 
 		db_instance = c.db;

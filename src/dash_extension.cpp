@@ -28,6 +28,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
 		tf.named_parameters["enable_cors"] = LogicalType::BOOLEAN;
 		tf.named_parameters["ui_proxy"] = LogicalType::VARCHAR;
+		tf.named_parameters["open_browser"] = LogicalType::BOOLEAN;
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}
 
@@ -63,7 +64,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		ExtensionUtil::RegisterFunction(instance, as_json_fun);
 
 		pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
-			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=True);";
+			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=False, open_browser=True)";
 		};
 
 		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
