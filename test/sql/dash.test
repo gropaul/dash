@@ -1,8 +1,20 @@
-# name: test/sql/file_utils.test
-# description: test hostfs extension file utils
-# group: [hostfs]
+# name: test/sql/dash.test
+# description: test dash extension
+# group: [dash]
 
 require dash
+
+query I
+CALL start_dash('127.0.0.1', 4200);
+----
+true
+
+query I
+CALL stop_dash()
+----
+true
+
+require httpfs
 
 statement ok
 LOAD httpfs;
