@@ -77,12 +77,12 @@ project(dash)
 # 2) Add a custom target that runs your Python script
 # The `ALL` ensures the script will run whenever you type `make`
 # (or build the default target).
-add_custom_target(
-        run_my_python_script ALL
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_ui.py
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}  # or wherever you need to run
-        COMMENT "Running Python script to build UI"
-)
+#add_custom_target(
+#        run_my_python_script ALL
+#        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_ui.py
+#        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}  # or wherever you need to run
+#        COMMENT "Running Python script to build UI"
+#)
 
 # Set extension name here
 set(TARGET_NAME dash)
@@ -115,8 +115,8 @@ target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 # 5) Make sure the extension depends on the script target
-add_dependencies(${EXTENSION_NAME} run_my_python_script)
-add_dependencies(${LOADABLE_EXTENSION_NAME} run_my_python_script)
+#add_dependencies(${EXTENSION_NAME} run_my_python_script)
+#add_dependencies(${LOADABLE_EXTENSION_NAME} run_my_python_script)
 
 install(
         TARGETS ${EXTENSION_NAME}

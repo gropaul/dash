@@ -316,6 +316,9 @@ def generate_ui_files():
 
         # on windows: replace \ with \\ to avoid escape sequences
         path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_").replace("__", "_").replace("\\", "\\\\")
+        # if ends with _ remove it
+        if path_as_name[-1] == "_":
+            path_as_name = path_as_name[:-1]
 
         final_path = target_dir + "/" + path_as_name + ".hpp"
 

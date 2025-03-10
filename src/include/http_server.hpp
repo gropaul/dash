@@ -17,24 +17,31 @@ using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
 #include <cstdlib>
 #include <string>
 
-static bool tryCommand(const std::string& command) {
+static bool tryCommand(const std::string& command, const std::string& argument) {
+	// Ensure argument does not contain unsafe characters
+	if (argument.find('"') != std::string::npos || argument.find(';') != std::string::npos ||
+		argument.find('|') != std::string::npos) {
+		return false; // Prevent command injection
+	    }
+
+	// Construct the command safely
+	const std::string safeCommand = command + " \"" + argument + "\"";
 	// system(...) returns -1 on error; return code depends on shell command success
-	// Here we just assume 0 is success, anything else is failure
-	return (std::system(command.c_str()) == 0);
+	return (std::system(safeCommand.c_str()) == 0);
 }
 
 static void openURL(const std::string& url) {
 	// Try xdg-open first
-	if (tryCommand("xdg-open \"" + url + "\" 2>/dev/null")) {
+	if (tryCommand("xdg-open", url)) {
 		return;
 	}
 	// Try open (macOS)
-	if (tryCommand("open \"" + url + "\" 2>/dev/null")) {
+	if (tryCommand("open", url)) {
 		return;
 	}
 	// Finally try start (Windows)
 	// The 2> redirection won't work on Windows cmd, but won't break either
-	tryCommand("start \"" + url + "\" 2>nul");
+	tryCommand("start", url + " 2> nul");
 }
 
 class DashHttpServer {
@@ -79,6 +86,7 @@ public:
 			auto encrypted_api_key = XorEncrypt(data.api_key, encryption_key);
 			user_click_url += "&k=" + StringUtil::URLEncode(encrypted_api_key);
 		}
+		openURL(user_click_url);
 		Printer::Print("Starting server on " + user_click_url);
 
 		db_instance = c.db;
