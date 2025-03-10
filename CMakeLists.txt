@@ -2,77 +2,77 @@ cmake_minimum_required(VERSION 3.5)
 project(dash)
 
 # 1) Find Python
-find_package(Python3 COMPONENTS Interpreter)
-
-if (NOT Python3_Interpreter_FOUND)
-    # print the current directory
-    message(STATUS "Python not found, trying to install it...")
-    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
-
-    if (WIN32)
-        set(SCRIPT_NAME "install_python_windows.bat")
-    elseif (APPLE)
-        set(SCRIPT_NAME "install_python_mac.sh")
-    elseif (UNIX)
-        set(SCRIPT_NAME "install_python_linux.sh")
-    else()
-        message(FATAL_ERROR "Unsupported platform.")
-    endif()
-
-    execute_process(
-            COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
-            RESULT_VARIABLE INSTALL_RESULT
-    )
-
-    if (INSTALL_RESULT)
-        message(FATAL_ERROR "Failed to install Python.")
-    endif()
-
-    find_package(Python3 REQUIRED)  # Re-check after installing
-endif()
-
-message(STATUS "Python found: ${Python3_EXECUTABLE}")
+#find_package(Python3 COMPONENTS Interpreter)
+#
+#if (NOT Python3_Interpreter_FOUND)
+#    # print the current directory
+#    message(STATUS "Python not found, trying to install it...")
+#    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
+#
+#    if (WIN32)
+#        set(SCRIPT_NAME "install_python_windows.bat")
+#    elseif (APPLE)
+#        set(SCRIPT_NAME "install_python_mac.sh")
+#    elseif (UNIX)
+#        set(SCRIPT_NAME "install_python_linux.sh")
+#    else()
+#        message(FATAL_ERROR "Unsupported platform.")
+#    endif()
+#
+#    execute_process(
+#            COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+#            RESULT_VARIABLE INSTALL_RESULT
+#    )
+#
+#    if (INSTALL_RESULT)
+#        message(FATAL_ERROR "Failed to install Python.")
+#    endif()
+#
+#    find_package(Python3 REQUIRED)  # Re-check after installing
+#endif()
+#
+#message(STATUS "Python found: ${Python3_EXECUTABLE}")
 
 
 # 1) Find npm
-find_program(NPM_EXECUTABLE NAMES npm)
-
-if (NOT NPM_EXECUTABLE)
-    message(STATUS "npm not found, trying to install it...")
-    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
-
-    if (WIN32)
-        set(SCRIPT_NAME "install_npm_windows.bat")
-        # On Windows, we typically run batch files via `cmd /c`
-        execute_process(
-                COMMAND cmd /c "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
-                RESULT_VARIABLE INSTALL_RESULT
-        )
-    elseif (APPLE)
-        set(SCRIPT_NAME "install_npm_mac.sh")
-        execute_process(
-                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
-                RESULT_VARIABLE INSTALL_RESULT
-        )
-    elseif (UNIX)
-        set(SCRIPT_NAME "install_npm_linux.sh")
-        execute_process(
-                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
-                RESULT_VARIABLE INSTALL_RESULT
-        )
-    else()
-        message(FATAL_ERROR "Unsupported platform.")
-    endif()
-
-    if (INSTALL_RESULT)
-        message(FATAL_ERROR "Failed to install npm.")
-    endif()
-endif()
-
-message(STATUS "npm found: ${NPM_EXECUTABLE}")
+#find_program(NPM_EXECUTABLE NAMES npm)
+#
+#if (NOT NPM_EXECUTABLE)
+#    message(STATUS "npm not found, trying to install it...")
+#    message(STATUS "Current directory: ${CMAKE_CURRENT_SOURCE_DIR}")
+#
+#    if (WIN32)
+#        set(SCRIPT_NAME "install_npm_windows.bat")
+#        # On Windows, we typically run batch files via `cmd /c`
+#        execute_process(
+#                COMMAND cmd /c "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+#                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+#                RESULT_VARIABLE INSTALL_RESULT
+#        )
+#    elseif (APPLE)
+#        set(SCRIPT_NAME "install_npm_mac.sh")
+#        execute_process(
+#                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+#                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+#                RESULT_VARIABLE INSTALL_RESULT
+#        )
+#    elseif (UNIX)
+#        set(SCRIPT_NAME "install_npm_linux.sh")
+#        execute_process(
+#                COMMAND ${CMAKE_COMMAND} -E env bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${SCRIPT_NAME}"
+#                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+#                RESULT_VARIABLE INSTALL_RESULT
+#        )
+#    else()
+#        message(FATAL_ERROR "Unsupported platform.")
+#    endif()
+#
+#    if (INSTALL_RESULT)
+#        message(FATAL_ERROR "Failed to install npm.")
+#    endif()
+#endif()
+#
+#message(STATUS "npm found: ${NPM_EXECUTABLE}")
 
 # 2) Add a custom target that runs your Python script
 # The `ALL` ensures the script will run whenever you type `make`

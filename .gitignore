@@ -6,4 +6,3 @@ duckdb_unittest_tempdir/
 testext
 __pycache__/
 .Rhistory
-gen
