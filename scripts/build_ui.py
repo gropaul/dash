@@ -7,6 +7,7 @@ import subprocess
 import shutil
 import sys
 import glob
+import base64
 
 def is_npm_installed():
     """
@@ -306,11 +307,11 @@ def generate_ui_files():
             "rb",
         ).read()
 
+        # Convert to Base64
+        encoded_content = base64.b64encode(content).decode("utf-8")
+
         # Goal: {0x33, 0x55}
-        transformed_content = "{"
-        for byte in content:
-            transformed_content += f"0x{byte:02x}, "
-        transformed_content += "}"
+        transformed_content = '"' + encoded_content + '"'
 
         path = normalize_path(file.replace(base_path, ""))
 

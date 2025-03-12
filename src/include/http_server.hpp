@@ -11,6 +11,8 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
 
+#include <duckdb/common/types/blob.hpp>
+
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
@@ -139,6 +141,14 @@ private:
 		}
 	}
 
+	vector<Byte> Base64Decode(const string &key) const {
+		auto result_size = Blob::FromBase64Size(key);
+		auto output = duckdb::unique_ptr<unsigned char[]>(new unsigned char[result_size]);
+		Blob::FromBase64(key, output.get(), result_size);
+		return vector<uint8_t>(output.get(), output.get() + result_size);
+	}
+
+
 	void ServerFromLocal(const Request &req, Response &res) const {
 		auto file = GetFile(req.path);
 		if (!file) {
@@ -147,10 +157,14 @@ private:
 			return;
 		}
 
-		const Byte *data = file->content.data();
-		const size_t size = file->content.size();
+		auto result_size = Blob::FromBase64Size(file->content);
+		vector<Byte> decoded = Base64Decode(file->content);
+		unsigned char *decoded_ptr = decoded.data();
+		// create a string from decoded bytes
+		std::string decoded_str(reinterpret_cast<char *>(decoded_ptr), result_size);
 
-		res.set_content(reinterpret_cast<char const *>(data), size, file->content_type);
+		// get the content as bytes
+		res.set_content(decoded_str, file->content_type);
 	}
 
 	void ServerFromProxy(const Request &req, Response &res) const {
