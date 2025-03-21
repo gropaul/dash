@@ -313,7 +313,7 @@ def generate_ui_files():
         # Goal: "base64 encoded content chunk" "base64 encoded content chunk" ...
         # we need to stay below the sting length limit of 65535
 
-        CHUNK_SIZE = 60000
+        CHUNK_SIZE = 16380 // 2
         chunks = [encoded_content[i : i + CHUNK_SIZE] for i in range(0, len(encoded_content), CHUNK_SIZE)]
         chunk_strings = [f'"{chunk}"' for chunk in chunks]
 
