@@ -11,30 +11,39 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
 
+#include <duckdb/common/types/blob.hpp>
+
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
 #include <cstdlib>
 #include <string>
 
-static bool tryCommand(const std::string& command) {
+static bool tryCommand(const std::string& command, const std::string& argument) {
+	// Ensure argument does not contain unsafe characters
+	if (argument.find('"') != std::string::npos || argument.find(';') != std::string::npos ||
+		argument.find('|') != std::string::npos) {
+		return false; // Prevent command injection
+	    }
+
+	// Construct the command safely
+	const std::string safeCommand = command + " \"" + argument + "\"";
 	// system(...) returns -1 on error; return code depends on shell command success
-	// Here we just assume 0 is success, anything else is failure
-	return (std::system(command.c_str()) == 0);
+	return (std::system(safeCommand.c_str()) == 0);
 }
 
 static void openURL(const std::string& url) {
 	// Try xdg-open first
-	if (tryCommand("xdg-open \"" + url + "\" 2>/dev/null")) {
+	if (tryCommand("xdg-open", url)) {
 		return;
 	}
 	// Try open (macOS)
-	if (tryCommand("open \"" + url + "\" 2>/dev/null")) {
+	if (tryCommand("open", url)) {
 		return;
 	}
 	// Finally try start (Windows)
 	// The 2> redirection won't work on Windows cmd, but won't break either
-	tryCommand("start \"" + url + "\" 2>nul");
+	tryCommand("start", url + " 2> nul");
 }
 
 class DashHttpServer {
@@ -78,6 +87,9 @@ public:
 			auto encryption_key = "DuckDB"; // this should not be secure, but just obfuscate the key
 			auto encrypted_api_key = XorEncrypt(data.api_key, encryption_key);
 			user_click_url += "&k=" + StringUtil::URLEncode(encrypted_api_key);
+		}
+		if (data.open_browser) {
+			openURL(user_click_url);
 		}
 		Printer::Print("Starting server on " + user_click_url);
 
@@ -129,6 +141,14 @@ private:
 		}
 	}
 
+	vector<Byte> Base64Decode(const string &key) const {
+		auto result_size = Blob::FromBase64Size(key);
+		auto output = duckdb::unique_ptr<unsigned char[]>(new unsigned char[result_size]);
+		Blob::FromBase64(key, output.get(), result_size);
+		return vector<uint8_t>(output.get(), output.get() + result_size);
+	}
+
+
 	void ServerFromLocal(const Request &req, Response &res) const {
 		auto file = GetFile(req.path);
 		if (!file) {
@@ -137,10 +157,14 @@ private:
 			return;
 		}
 
-		const Byte *data = file->content.data();
-		const size_t size = file->content.size();
+		auto result_size = Blob::FromBase64Size(file->content);
+		vector<Byte> decoded = Base64Decode(file->content);
+		unsigned char *decoded_ptr = decoded.data();
+		// create a string from decoded bytes
+		std::string decoded_str(reinterpret_cast<char *>(decoded_ptr), result_size);
 
-		res.set_content(reinterpret_cast<char const *>(data), size, file->content_type);
+		// get the content as bytes
+		res.set_content(decoded_str, file->content_type);
 	}
 
 	void ServerFromProxy(const Request &req, Response &res) const {

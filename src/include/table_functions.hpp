@@ -72,6 +72,7 @@ inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFuncti
 	});
 
 	const auto enable_cors = GetOrDefault<bool>(input, "enable_cors", false);
+	const auto open_browser = GetOrDefault<bool>(input, "open_browser", false);
 	const auto ui_proxy = GetOrDefault<string>(input, "ui_proxy", "", [](const string &value) {
 		const auto uri = Uri::Parse(value);
 		uri.AssertValid();
@@ -83,7 +84,7 @@ inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFuncti
 		}
 	});
 
-	return make_uniq_base<FunctionData, StartServerFunctionData>(host, port, api_key, enable_cors,
+	return make_uniq_base<FunctionData, StartServerFunctionData>(host, port, api_key, enable_cors, open_browser,
 	                                                             Uri::Parse(ui_proxy));
 }
 

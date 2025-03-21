@@ -7,6 +7,7 @@ import subprocess
 import shutil
 import sys
 import glob
+import base64
 
 def is_npm_installed():
     """
@@ -306,16 +307,26 @@ def generate_ui_files():
             "rb",
         ).read()
 
-        # Goal: {0x33, 0x55}
-        transformed_content = "{"
-        for byte in content:
-            transformed_content += f"0x{byte:02x}, "
-        transformed_content += "}"
+        # Convert to Base64
+        encoded_content = base64.b64encode(content).decode("utf-8")
+
+        # Goal: "base64 encoded content chunk" "base64 encoded content chunk" ...
+        # we need to stay below the sting length limit of 65535
+
+        CHUNK_SIZE = 16380 // 2
+        chunks = [encoded_content[i : i + CHUNK_SIZE] for i in range(0, len(encoded_content), CHUNK_SIZE)]
+        chunk_strings = [f'"{chunk}"' for chunk in chunks]
+
+        transformed_content = "\n     ".join(chunk_strings)
+
 
         path = normalize_path(file.replace(base_path, ""))
 
         # on windows: replace \ with \\ to avoid escape sequences
         path_as_name = "file" + path.replace("/", "_").replace(".", "_").replace("-", "_").replace("__", "_").replace("\\", "\\\\")
+        # if ends with _ remove it
+        if path_as_name[-1] == "_":
+            path_as_name = path_as_name[:-1]
 
         final_path = target_dir + "/" + path_as_name + ".hpp"
 

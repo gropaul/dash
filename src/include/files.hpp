@@ -11,7 +11,7 @@ typedef std::string Path;
 typedef unsigned char Byte;
 
 struct File {
-	std::vector<Byte> content;
+	std::string content;  // base64 encoded
 	std::string content_type;
 	std::string path;
 };
