@@ -310,8 +310,15 @@ def generate_ui_files():
         # Convert to Base64
         encoded_content = base64.b64encode(content).decode("utf-8")
 
-        # Goal: {0x33, 0x55}
-        transformed_content = '"' + encoded_content + '"'
+        # Goal: "base64 encoded content chunk" "base64 encoded content chunk" ...
+        # we need to stay below the sting length limit of 65535
+
+        CHUNK_SIZE = 60000
+        chunks = [encoded_content[i : i + CHUNK_SIZE] for i in range(0, len(encoded_content), CHUNK_SIZE)]
+        chunk_strings = [f'"{chunk}"' for chunk in chunks]
+
+        transformed_content = "\n     ".join(chunk_strings)
+
 
         path = normalize_path(file.replace(base_path, ""))
 
