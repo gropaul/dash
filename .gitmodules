@@ -6,3 +6,7 @@
 	path = dash-ui
 	url = https://github.com/gropaul/dash-ui
 	branch = main
+[submodule "extension-ci-tools"]
+	path = extension-ci-tools
+	url = https://github.com/duckdb/extension-ci-tools.git
+	branch = v1.2.1
