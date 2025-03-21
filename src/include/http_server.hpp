@@ -157,7 +157,8 @@ private:
 			return;
 		}
 
-		auto result_size = Blob::FromBase64Size(file->content);
+		auto string_content = std::string(file->content, file->content_length);
+		auto result_size = Blob::FromBase64Size(string_content);
 		vector<Byte> decoded = Base64Decode(file->content);
 		unsigned char *decoded_ptr = decoded.data();
 		// create a string from decoded bytes

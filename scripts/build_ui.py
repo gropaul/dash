@@ -215,8 +215,10 @@ namespace duckdb {
 const File %var_name% = {
      // Content
      %content%,    //
+     %content_length%, //
      "%content_type%", //
      "%path%", //
+     
 };
 }
 """
@@ -333,6 +335,7 @@ def generate_ui_files():
         templated = (
             CONTENT_TEMPLATE.replace("%path%", path)
             .replace("%content%", transformed_content)
+            .replace("%content_length%", str(len(encoded_content)))
             .replace("%content_type%", get_content_type(file))
             .replace("%var_name%", path_as_name.upper())
         )

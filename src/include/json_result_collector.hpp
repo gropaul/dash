@@ -10,7 +10,7 @@ namespace duckdb {
 class JsonResultCollector final : public PhysicalMaterializedCollector {
 public:
 	explicit JsonResultCollector(ClientContext &context, PreparedStatementData &data, const ResponseFormat format_)
-	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, data.physical_plan->Root())),
+	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, *data.plan)),
 	      format(format_) {
 	}
 
