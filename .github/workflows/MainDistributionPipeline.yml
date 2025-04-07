@@ -13,15 +13,15 @@ concurrency:
 
 jobs:
   duckdb-next-build:
-    name: Build extension binaries
+    name: Build extension binaries (main)
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
     with:
-      duckdb_version: v1.2.1
-      ci_tools_version: v1.2.1
+      duckdb_version: main
+      ci_tools_version: main
       extension_name: dash
 
   duckdb-stable-build:
-    name: Build extension binaries
+    name: Build extension binaries (stable)
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.2.1
     with:
       duckdb_version: v1.2.1
