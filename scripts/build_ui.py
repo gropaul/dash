@@ -203,7 +203,7 @@ def build_ui():
 
     # build the UI
     print("Building UI...")
-    os.system("pnpm run build:extension")
+    os.system("pnpm run build")
 
 root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 target_file = os.path.join(root_dir, "src", "gen", "files.cpp")

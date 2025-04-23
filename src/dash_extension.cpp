@@ -14,6 +14,15 @@
 
 namespace duckdb {
 
+inline void QuackScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
+	auto &name_vector = args.data[0];
+	UnaryExecutor::Execute<string_t, string_t>(
+		name_vector, result, args.size(),
+		[&](string_t name) {
+			return StringVector::AddString(result, "Quack "+name.GetString()+" 🐥");
+		});
+}
+
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection conn(instance);
 	conn.BeginTransaction();
@@ -40,6 +49,10 @@ static void LoadInternal(DatabaseInstance &instance) {
 	}
 #endif
 	{
+
+		auto quack_scalar_function = ScalarFunction("quack", {LogicalType::VARCHAR}, LogicalType::VARCHAR, QuackScalarFun);
+		ExtensionUtil::RegisterFunction(instance, quack_scalar_function);
+
 		pragma_query_t as_json = [](ClientContext &context, const FunctionParameters &type) -> string {
 			ResponseFormat serializer_format;
 			const auto format_it = type.named_parameters.find("format");
@@ -63,7 +76,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		as_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
 		ExtensionUtil::RegisterFunction(instance, as_json_fun);
 
-		pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
+		const pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
 			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=False, open_browser=True)";
 		};
 
