@@ -84,6 +84,17 @@ project(dash)
 #        COMMENT "Running Python script to build UI"
 #)
 
+# CMake example
+string(REGEX MATCH "v([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ ${DUCKDB_VERSION})
+set(DUCKDB_MAJOR_VERSION "${CMAKE_MATCH_1}")
+set(DUCKDB_MINOR_VERSION "${CMAKE_MATCH_2}")
+set(DUCKDB_PATCH_VERSION "${CMAKE_MATCH_3}")
+add_compile_definitions(
+    DUCKDB_MAJOR_VERSION=${DUCKDB_MAJOR_VERSION}
+    DUCKDB_MINOR_VERSION=${DUCKDB_MINOR_VERSION}
+    DUCKDB_PATCH_VERSION=${DUCKDB_PATCH_VERSION}
+)
+
 # Set extension name here
 set(TARGET_NAME dash)
 

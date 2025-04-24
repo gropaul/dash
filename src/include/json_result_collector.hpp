@@ -6,11 +6,27 @@
 #include "serializer/result_serializer.hpp"
 
 namespace duckdb {
+#define DUCKDB_VERSION_ENCODE(major, minor, patch) ((major) * 10000 + (minor) * 100 + (patch))
+#define DUCKDB_CURRENT_VERSION DUCKDB_VERSION_ENCODE(DUCKDB_MAJOR_VERSION, DUCKDB_MINOR_VERSION, DUCKDB_PATCH_VERSION)
+
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(1, 3, 0)
+static PhysicalOperator* GetPlan(PreparedStatementData &data) {
+	std::string version = std::to_string(DUCKDB_CURRENT_VERSION);
+	std::cout << version << std::endl;
+	return &data.physical_plan->Root();
+}
+
+#else
+static PhysicalOperator* GetPlan(PreparedStatementData &data) {
+	return data.plan.get();
+}
+#endif
+
 
 class JsonResultCollector final : public PhysicalMaterializedCollector {
 public:
 	explicit JsonResultCollector(ClientContext &context, PreparedStatementData &data, const ResponseFormat format_)
-	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, *data.plan)),
+	    : PhysicalMaterializedCollector(data, !PhysicalPlanGenerator::PreserveInsertionOrder(context, *GetPlan(data))),
 	      format(format_) {
 	}
 
