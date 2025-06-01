@@ -6,17 +6,25 @@
 #include "serializer/result_serializer.hpp"
 
 namespace duckdb {
+
 #define DUCKDB_VERSION_ENCODE(major, minor, patch) ((major) * 10000 + (minor) * 100 + (patch))
 #define DUCKDB_CURRENT_VERSION DUCKDB_VERSION_ENCODE(DUCKDB_MAJOR_VERSION, DUCKDB_MINOR_VERSION, DUCKDB_PATCH_VERSION)
 
+#define STRINGIFY2(x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
+
+#define DUCKDB_VERSION_CODE DUCKDB_VERSION_ENCODE(DUCKDB_MAJOR_VERSION, DUCKDB_MINOR_VERSION, DUCKDB_PATCH_VERSION)
+
+// Manual calculation since pragma can't evaluate arithmetic expressions
+#pragma message("DUCKDB version code: " STRINGIFY(DUCKDB_VERSION_CODE))
+
 #if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(1, 3, 0)
+#pragma message("Using GetPlan with physical_plan->Root() (DuckDB >= 1.3.0)")
 static PhysicalOperator* GetPlan(PreparedStatementData &data) {
-	std::string version = std::to_string(DUCKDB_CURRENT_VERSION);
-	std::cout << version << std::endl;
 	return &data.physical_plan->Root();
 }
-
 #else
+#pragma message("Using GetPlan with plan.get() (DuckDB < 1.3.0)")
 static PhysicalOperator* GetPlan(PreparedStatementData &data) {
 	return data.plan.get();
 }
