@@ -23,12 +23,20 @@ namespace duckdb {
 static PhysicalOperator* GetPlan(PreparedStatementData &data) {
 	return &data.physical_plan->Root();
 }
+
+#elif DUCKDB_CURRENT_VERSION < DUCKDB_VERSION_ENCODE(0, 99, 0)
+#pragma message("Using GetPlan with physical_plan->Root() (DuckDB < 0.99.0)")
+static PhysicalOperator* GetPlan(PreparedStatementData &data) {
+	return &data.physical_plan->Root();
+}
+
 #else
-#pragma message("Using GetPlan with plan.get() (DuckDB < 1.3.0)")
+#pragma message("Using GetPlan with plan.get() (0.99.0 <= DuckDB < 1.3.0)")
 static PhysicalOperator* GetPlan(PreparedStatementData &data) {
 	return data.plan.get();
 }
 #endif
+
 
 
 class JsonResultCollector final : public PhysicalMaterializedCollector {
