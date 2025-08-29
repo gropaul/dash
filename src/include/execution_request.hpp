@@ -56,6 +56,8 @@ struct ExecutionRequest {
 			return {BadRequest_400, result->GetErrorObject()};
 		}
 
+		//todo: here we need to requery
+
 		auto serializer = ResultSerializer::Create(format);
 		const auto json = serializer->Serialize(*result);
 		res.set_content(json, "application/json");

@@ -8,6 +8,7 @@
 #include "include/http_server.hpp"
 #include "include/table_functions.hpp"
 #endif
+#include "result_table_function.hpp"
 #include "include/json_result_collector.hpp"
 #include "include/response_format.hpp"
 #include "include/string_util.hpp"
@@ -82,11 +83,11 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
 		ExtensionUtil::RegisterFunction(instance, dash);
-
 	}
 
 
-
+	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
+	ExtensionUtil::RegisterFunction(instance, query_result);
 
 	conn.Commit();
 }
