@@ -9,9 +9,6 @@
 #include "include/table_functions.hpp"
 #endif
 #include "query_result_table_function.hpp"
-#include "include/json_result_collector.hpp"
-#include "include/response_format.hpp"
-#include "include/string_util.hpp"
 
 namespace duckdb {
 
@@ -53,29 +50,6 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 		auto quack_scalar_function = ScalarFunction("quack", {LogicalType::VARCHAR}, LogicalType::VARCHAR, QuackScalarFun);
 		ExtensionUtil::RegisterFunction(instance, quack_scalar_function);
-
-		pragma_query_t as_json = [](ClientContext &context, const FunctionParameters &type) -> string {
-			ResponseFormat serializer_format;
-			const auto format_it = type.named_parameters.find("format");
-			if (format_it != type.named_parameters.end()) {
-				serializer_format = string_util::FromString<ResponseFormat>(format_it->second.ToString());
-			} else {
-				serializer_format = ResponseFormat::JSON;
-			}
-
-			auto& client_config = ClientConfig::GetConfig(context);
-			auto previous_result_collector = client_config.result_collector;
-			client_config.result_collector = [serializer_format, previous_result_collector] //
-			    (ClientContext & c, PreparedStatementData & data) {
-				    ClientConfig::GetConfig(c).result_collector = previous_result_collector;
-				    return make_uniq<JsonResultCollector>(c, data, serializer_format);
-			    };
-			return type.values[0].ToString();
-		};
-
-		auto as_json_fun = PragmaFunction::PragmaCall("as_json", as_json, {LogicalType::VARCHAR});
-		as_json_fun.named_parameters["format"] = LogicalType::VARCHAR;
-		ExtensionUtil::RegisterFunction(instance, as_json_fun);
 
 		const pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
 			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=False, open_browser=True)";

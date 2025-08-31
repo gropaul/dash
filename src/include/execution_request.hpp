@@ -5,12 +5,12 @@
 #include "duckdb/main/connection.hpp"
 #include "response_format.hpp"
 #include "result.hpp"
-#include "serializer/result_serializer.hpp"
 #include "temp_file.hpp"
 #include "yyjson.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
+#include "string_util.hpp"
 #include "utils.hpp"
 #include "fmt/format.h"
 
@@ -52,7 +52,7 @@ struct ExecutionRequest {
 				return {InternalServerError_500, result->GetErrorObject()};
 			}
 		}
-		const string escaped_query = escape_quotes(query);
+		const string escaped_query = EscapeQutes(query);
 
 		const std::string query_template = R"(
 		    WITH data AS MATERIALIZED (

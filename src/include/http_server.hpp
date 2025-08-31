@@ -16,7 +16,6 @@
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
-#include <cstdlib>
 #include <string>
 
 static bool tryCommand(const std::string& command, const std::string& argument) {
