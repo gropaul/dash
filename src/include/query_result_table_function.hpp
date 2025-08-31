@@ -21,7 +21,6 @@ struct QueryResultFunctionData final : FunctionData {
 	}
 
 	unique_ptr<FunctionData> Copy() const override {
-		printf("Copying QueryResultFunctionData");
 		throw Exception(ExceptionType::INTERNAL, "Cant copy this");
 	}
 
@@ -61,7 +60,6 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 		throw Exception(ExceptionType::BINDER, "QueryResult needs exactly one argument");
 	}
 
-	printf("Query binding is happening\n");
 	const string query = input.inputs[0].GetValue<string>();
 	Connection conn(*context.db);
 	auto result = conn.Query(query);

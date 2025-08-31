@@ -52,7 +52,6 @@ struct ExecutionRequest {
 				return {InternalServerError_500, result->GetErrorObject()};
 			}
 		}
-		printf("Processing %s\n", query.data());
 		const string escaped_query = escape_quotes(query);
 
 		const std::string query_template = R"(
