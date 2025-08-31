@@ -2,6 +2,7 @@
 
 #include "dash_extension.hpp"
 #include "duckdb.hpp"
+#include "utils.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
@@ -13,12 +14,14 @@
 namespace duckdb {
 struct QueryResultFunctionData final : FunctionData {
 
+	unique_ptr<MaterializedQueryResult> result;
 	string query;
-	explicit QueryResultFunctionData(const string query_p) : query(query_p) {
+	explicit QueryResultFunctionData(const string &query_p, unique_ptr<MaterializedQueryResult> result_p) : query(query_p), result(std::move(result_p)) {
+
 	}
 
 	unique_ptr<FunctionData> Copy() const override {
-		return make_uniq<QueryResultFunctionData>(this->query);
+		throw Exception(ExceptionType::INTERNAL, "Cant copy this");
 	}
 
 	bool Equals(const FunctionData &other) const override {
@@ -40,15 +43,8 @@ struct QueryResultState final : GlobalTableFunctionState {
 };
 
 static void QueryResultFun(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
-
 	auto &function_data = data_p.bind_data->Cast<QueryResultFunctionData>();
-	auto &state = data_p.global_state->Cast<QueryResultState>();
-	if (!state.has_result) {
-		state.has_result = true;
-		Connection conn(*context.db);
-		state.result = conn.Query(function_data.query);
-	}
-	const auto chunk = state.result->Fetch();
+	const auto chunk = function_data.result->Fetch();
 	if (chunk) {
 		output.Reference(*chunk);
 		output.SetCardinality(chunk->size());
@@ -66,24 +62,17 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 
 	const string query = input.inputs[0].GetValue<string>();
 
+
 	Connection conn(*context.db);
-	const auto prepared_statement = conn.Prepare(query);
+	auto result = conn.Query(query);
 
-	if (prepared_statement->HasError()) {
-		throw Exception(prepared_statement->error.Type(), prepared_statement->error.RawMessage());
-	} else {
-		const auto &result_types = prepared_statement->data->types;
-		const auto &result_names = prepared_statement->data->names;
-
-		// add the result types and names to the return vectors
-		for (idx_t i = 0; i < result_types.size(); i++) {
-			return_types.push_back(result_types[i]);
-			names.push_back(result_names[i]);
-		}
+	for (int col_idx = 0; col_idx < result->ColumnCount(); col_idx ++) {
+		return_types.push_back(result->types[col_idx]);
+		names.push_back(result->names[col_idx]);
 	}
 
-
-	auto data = make_uniq<QueryResultFunctionData>(query);
+	auto data = make_uniq<QueryResultFunctionData>(query, std::move(result));
 	return std::move(data);
+
 }
 } // namespace duckdb

@@ -11,6 +11,8 @@
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
+#include "utils.hpp"
+#include "fmt/format.h"
 
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
@@ -51,16 +53,20 @@ struct ExecutionRequest {
 			}
 		}
 
-		auto result = conn.Query(query);
+		const string escaped_query = escape_quotes(query);
+		const string json_query = duckdb_fmt::format(
+			"SELECT json_object('rows', rows, 'columns', columns, 'stats', {{ rows: len(rows) }}) "
+			"FROM query_result_json('{}')",
+			escaped_query
+		);
+
+		auto result = conn.Query(json_query);
 		if (result->HasError()) {
 			return {BadRequest_400, result->GetErrorObject()};
 		}
 
-		//todo: here we need to requery
-
-		auto serializer = ResultSerializer::Create(format);
-		const auto json = serializer->Serialize(*result);
-		res.set_content(json, "application/json");
+		const auto json = result->GetValue(0,0);
+		res.set_content(json.ToString(), "application/json");
 
 		return nullptr;
 	}

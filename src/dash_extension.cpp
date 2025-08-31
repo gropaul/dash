@@ -8,7 +8,8 @@
 #include "include/http_server.hpp"
 #include "include/table_functions.hpp"
 #endif
-#include "result_table_function.hpp"
+#include "query_result_json_table_function.hpp"
+#include "query_result_table_function.hpp"
 #include "include/json_result_collector.hpp"
 #include "include/response_format.hpp"
 #include "include/string_util.hpp"
@@ -88,6 +89,9 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
 	ExtensionUtil::RegisterFunction(instance, query_result);
+
+	TableFunction query_result_json("query_result_json", {LogicalType::VARCHAR}, QueryResultJsonFun, QueryResultJsonBind, QueryResultJsonState::Init);
+	ExtensionUtil::RegisterFunction(instance, query_result_json);
 
 	conn.Commit();
 }
