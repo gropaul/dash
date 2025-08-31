@@ -76,6 +76,13 @@ void DashExtension::Load(ExtensionLoader &loader) {
 	LoadInternal(loader);
 }
 
+extern "C" {
+
+	DUCKDB_CPP_EXTENSION_ENTRY(dasb, loader) {
+		duckdb::LoadInternal(loader);
+	}
+}
+
 #else
 
 #include "duckdb/main/extension_util.hpp"
@@ -125,6 +132,21 @@ void DashExtension::Load(DuckDB &db) {
 	LoadInternal(*db.instance);
 }
 
+#endif
+extern "C" {
+
+	DUCKDB_EXTENSION_API void quack_init(duckdb::DatabaseInstance &db) {
+		duckdb::DuckDB db_wrapper(db);
+		db_wrapper.LoadExtension<duckdb::DashExtension>();
+	}
+
+	DUCKDB_EXTENSION_API const char *quack_version() {
+		return duckdb::DuckDB::LibraryVersion();
+	}
+}
+
+#ifndef DUCKDB_EXTENSION_MAIN
+#error DUCKDB_EXTENSION_MAIN not defined
 #endif
 
 std::string DashExtension::Name() {
