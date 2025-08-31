@@ -59,13 +59,18 @@ struct ExecutionRequest {
 		    WITH data AS MATERIALIZED (
 		        FROM query_result('{}')
 		    ),
-		    json_data AS (
-		        SELECT to_json(COLUMNS(*))
-		        FROM data
-		    ),
-			json_list AS (
-				SELECT ifnull(list([*COLUMNS(*)]), []) as data
-				FROM json_data
+			dash_row_number_ids AS (
+			        SELECT range as dash_row_number_id
+			        FROM range((SELECT COUNT(*) FROM data))
+			),
+			json_data AS (
+			        SELECT dash_row_number_ids.dash_row_number_id, to_json(COLUMNS(c -> c != 'dash_row_number_id'))
+			        FROM data
+			        POSITIONAL JOIN dash_row_number_ids
+			),
+			json_list AS MATERIALIZED (
+			        SELECT ifnull(list([*COLUMNS(c -> c != 'dash_row_number_id')] ORDER BY dash_row_number_id), []) as data
+			        FROM json_data
 			),
 		    types_data AS (SELECT ANY_VALUE(typeof(COLUMNS(*))) FROM data),
 			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, list_filter(types_with_null, x -> x is not null) as types FROM types_data),
