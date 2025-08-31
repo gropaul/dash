@@ -68,9 +68,9 @@ struct ExecutionRequest {
 				FROM json_data
 			),
 		    types_data AS (SELECT ANY_VALUE(typeof(COLUMNS(*))) FROM data),
-			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, if(types_with_null=[null], [], types_with_null) as types FROM types_data),
+			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, list_filter(types_with_null, x -> x is not null) as types FROM types_data),
 			names_data AS (SELECT ANY_VALUE(alias(COLUMNS(*))) FROM data),
-			names_list_data AS (SELECT [(*COLUMNS(*))] as names_with_null, if(names_with_null=[null], [], names_with_null) as names FROM names_data),
+			names_list_data AS (SELECT [(*COLUMNS(*))] as names_with_null, list_filter(names_with_null, x -> x is not null) as names FROM names_data),
 
 			combined_data AS (
 				SELECT data as rows, list_transform(list_zip(types, names), x -> {{type: x[1], name: x[2]}}) as columns, names

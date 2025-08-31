@@ -6,8 +6,6 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
-#include "duckdb/parser/parser.hpp"
-#include "duckdb/planner/planner.hpp"
 
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
@@ -16,8 +14,9 @@
 namespace duckdb {
 struct QueryResultFunctionData final : FunctionData {
 
+	unique_ptr<MaterializedQueryResult> result;
 	string query;
-	explicit QueryResultFunctionData(const string &query_p) : query(query_p) {
+	explicit QueryResultFunctionData(const string &query_p, unique_ptr<MaterializedQueryResult> result_p) : result(std::move(result_p)), query(query_p) {
 
 	}
 
@@ -45,15 +44,8 @@ struct QueryResultState final : GlobalTableFunctionState {
 };
 
 static void QueryResultFun(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
-
 	auto &function_data = data_p.bind_data->Cast<QueryResultFunctionData>();
-	auto &state = data_p.global_state->Cast<QueryResultState>();
-	if (!state.has_result) {
-		state.has_result = true;
-		Connection conn(*context.db);
-		state.result = conn.Query(function_data.query);
-	}
-	const auto chunk = state.result->Fetch();
+	const auto chunk = function_data.result->Fetch();
 	if (chunk) {
 		output.Reference(*chunk);
 		output.SetCardinality(chunk->size());
@@ -69,33 +61,21 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 		throw Exception(ExceptionType::BINDER, "QueryResult needs exactly one argument");
 	}
 
-	Parser parser;
+	printf("Query binding is happening\n");
 	const string query = input.inputs[0].GetValue<string>();
-	parser.ParseQuery(query);
-	const auto &statements = parser.statements;
-	const auto &last_statement = statements[0];
+	Connection conn(*context.db);
+	auto result = conn.Query(query);
 
-	const Planner logical_planner(context);
-	auto bound_statement = logical_planner.binder->Bind(*last_statement.get());
-
-
-	// logical_planner.CreatePlan(std::move(statement));
-
-	// Connection conn(*context.db);
-	// context.GetTableNames()
-	// auto root = conn.ExtractPlan(query);
-
-	// if (result->HasError()) {
-	// 	throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
-	// }
-
-	const idx_t column_count = bound_statement.types.size();
-	for (int col_idx = 0; col_idx < column_count; col_idx ++) {
-		return_types.push_back(bound_statement.types[col_idx]);
-		names.push_back(bound_statement.names[col_idx]);
+	if (result->HasError()) {
+		throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
 	}
 
-	auto data = make_uniq<QueryResultFunctionData>(query);
+	for (int col_idx = 0; col_idx < result->ColumnCount(); col_idx ++) {
+		return_types.push_back(result->types[col_idx]);
+		names.push_back(result->names[col_idx]);
+	}
+
+	auto data = make_uniq<QueryResultFunctionData>(query, std::move(result));
 	return std::move(data);
 
 }
