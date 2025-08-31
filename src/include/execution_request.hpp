@@ -52,13 +52,37 @@ struct ExecutionRequest {
 				return {InternalServerError_500, result->GetErrorObject()};
 			}
 		}
-
+		printf("Processing %s\n", query.data());
 		const string escaped_query = escape_quotes(query);
-		const string json_query = duckdb_fmt::format(
-			"SELECT json_object('rows', rows, 'columns', columns, 'stats', {{ rows: len(rows) }}) "
-			"FROM query_result_json('{}')",
-			escaped_query
-		);
+
+		const std::string query_template = R"(
+		    WITH data AS MATERIALIZED (
+		        FROM query_result('{}')
+		    ),
+		    json_data AS (
+		        SELECT to_json(COLUMNS(*))
+		        FROM data
+		    ),
+			json_list AS (
+				SELECT ifnull(list([*COLUMNS(*)]), []) as data
+				FROM json_data
+			),
+		    types_data AS (SELECT ANY_VALUE(typeof(COLUMNS(*))) FROM data),
+			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, if(types_with_null=[null], [], types_with_null) as types FROM types_data),
+			names_data AS (SELECT ANY_VALUE(alias(COLUMNS(*))) FROM data),
+			names_list_data AS (SELECT [(*COLUMNS(*))] as names_with_null, if(names_with_null=[null], [], names_with_null) as names FROM names_data),
+
+			combined_data AS (
+				SELECT data as rows, list_transform(list_zip(types, names), x -> {{type: x[1], name: x[2]}}) as columns, names
+				FROM json_list
+				POSITIONAL JOIN types_list_data
+				POSITIONAL JOIN names_list_data
+			)
+			SELECT json_object('rows', rows, 'columns', columns, 'stats', {{ rows: len(rows) }}), names
+			FROM combined_data
+
+		)";
+		const string json_query = duckdb_fmt::format(query_template, escaped_query);
 
 		auto result = conn.Query(json_query);
 		if (result->HasError()) {
