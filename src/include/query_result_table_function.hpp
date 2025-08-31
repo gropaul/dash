@@ -2,9 +2,7 @@
 
 #include "dash_extension.hpp"
 #include "duckdb.hpp"
-#include "utils.hpp"
 #include "duckdb/common/exception.hpp"
-#include "duckdb/main/extension_util.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
 
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
