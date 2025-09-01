@@ -5,9 +5,6 @@
 #define STRINGIFY2(x) #x
 #define STRINGIFY(x) STRINGIFY2(x)
 
-#define STRINGIFY2(x) #x
-#define STRINGIFY(x) STRINGIFY2(x)
-
 #define DUCKDB_VERSION_CODE DUCKDB_VERSION_ENCODE(DUCKDB_MAJOR_VERSION, DUCKDB_MINOR_VERSION, DUCKDB_PATCH_VERSION)
 
 // Manual calculation since pragma can't evaluate arithmetic expressions
@@ -83,6 +80,9 @@ extern "C" {
 	}
 }
 
+
+// *** DUCKDB < v1.3.3 ***
+
 #else
 
 #include "duckdb/main/extension_util.hpp"
@@ -132,18 +132,20 @@ void DashExtension::Load(DuckDB &db) {
 	LoadInternal(*db.instance);
 }
 
-#endif
 extern "C" {
 
-	DUCKDB_EXTENSION_API void quack_init(duckdb::DatabaseInstance &db) {
+	DUCKDB_EXTENSION_API void dash_init(duckdb::DatabaseInstance &db) {
 		duckdb::DuckDB db_wrapper(db);
 		db_wrapper.LoadExtension<duckdb::DashExtension>();
 	}
 
-	DUCKDB_EXTENSION_API const char *quack_version() {
+	DUCKDB_EXTENSION_API const char *dash_version() {
 		return duckdb::DuckDB::LibraryVersion();
 	}
 }
+
+#endif
+
 
 #ifndef DUCKDB_EXTENSION_MAIN
 #error DUCKDB_EXTENSION_MAIN not defined
