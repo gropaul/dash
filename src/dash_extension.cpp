@@ -75,7 +75,7 @@ void DashExtension::Load(ExtensionLoader &loader) {
 
 extern "C" {
 
-	DUCKDB_CPP_EXTENSION_ENTRY(dasb, loader) {
+	DUCKDB_CPP_EXTENSION_ENTRY(dash, loader) {
 		duckdb::LoadInternal(loader);
 	}
 }
