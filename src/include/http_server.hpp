@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/main/client_context.hpp"
+#include "duckdb/main/connection_manager.hpp"
 #include "execution_request.hpp"
 #include "files.hpp"
 #include "http_error_data.hpp"
@@ -49,6 +50,7 @@ class DashHttpServer {
 public:
 	DashHttpServer() {
 		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
+		server.Post("/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
 		server.Get("/ping", [](const Request &, Response &res) { res.body = "pong"; });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
 		server.Options(".*", [this](const Request &, Response &res) { AddCorsHeaders(res); });
@@ -130,6 +132,36 @@ private:
 		RETURN_IF_ERROR_CB(execution_request, ([&res](const HttpErrorData &error) { RespondError(error, res); }))
 		auto execution_error = execution_request->Execute(db_instance.lock(), res);
 		RETURN_IF_ERROR_CB(execution_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+	}
+
+	void CancelAllQueries(const Request &req, Response &res) const {
+		AddCorsHeaders(res);
+
+		auto result = HasCorrectApiKey(api_key, req);
+		RETURN_IF_ERROR_CB(result, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+
+		auto db = db_instance.lock();
+		if (!db) {
+			res.status = 500;
+			res.set_content("{\"error\": \"Database not available\"}", "application/json");
+			return;
+		}
+
+		// Get all active connections and interrupt them
+		auto &connection_manager = ConnectionManager::Get(*db);
+		auto connections = connection_manager.GetConnectionList();
+
+		idx_t cancelled_count = 0;
+		for (auto &context : connections) {
+			if (context) {
+				context->Interrupt();
+				cancelled_count++;
+			}
+		}
+
+		// Return success response with count
+		res.status = 200;
+		res.set_content("{\"cancelled\": " + std::to_string(cancelled_count) + "}", "application/json");
 	}
 
 	void ServeUi(const Request &req, Response &res) const {

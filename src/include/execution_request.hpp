@@ -109,22 +109,6 @@ struct ExecutionRequest {
 	}
 
 private:
-	static Result<std::nullptr_t> HasCorrectApiKey(const std::string &api_key, const Request &req) {
-		if (api_key.empty()) {
-			return nullptr;
-		}
-
-		const auto &api_key_header = req.get_header_value("X-Api-Key");
-		if (api_key_header.empty()) {
-			return HttpErrorData {Unauthorized_401, "Missing 'X-Api-Key' header"};
-		}
-
-		if (api_key_header != api_key) {
-			return HttpErrorData {Unauthorized_401, "Invalid API key"};
-		}
-
-		return nullptr;
-	}
 
 	static Result<std::pair<std::string, const MultipartFormDataMap &>> GetRequestBody(const Request &req) {
 		if (req.is_multipart_form_data()) {
