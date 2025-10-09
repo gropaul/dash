@@ -6,8 +6,8 @@
 
 ```sql
 FROM community INSTALL dash;
-LOAD
-dash;
+LOAD dash;
+PRAGMA dash;
 ```
 
 ### Usage
