@@ -1,6 +1,10 @@
 # Dash
+https://github.com/user-attachments/assets/96f3f4fb-1f53-4113-b1d5-d55934c865e0
 
 ## Getting started
+
+
+
 
 ### Installation
 
