@@ -1,0 +1,13 @@
+
+#pragma once
+#include "files.hpp"
+namespace duckdb {
+const File FILE_NEXT_STATIC_CHUNKS_MAIN_APP_6E54874FD7882030_JS = {
+     // Content
+     "KHNlbGYud2VicGFja0NodW5rX05fRT1zZWxmLndlYnBhY2tDaHVua19OX0V8fFtdKS5wdXNoKFtbMzU4XSx7NjMwNDg6KCk9Pnt9LDg1ODE1OihlLHMsbik9PntQcm9taXNlLnJlc29sdmUoKS50aGVuKG4udC5iaW5kKG4sNjY0MDYsMjMpKSxQcm9taXNlLnJlc29sdmUoKS50aGVuKG4udC5iaW5kKG4sNzA0OTUsMjMpKSxQcm9taXNlLnJlc29sdmUoKS50aGVuKG4udC5iaW5kKG4sNjExNjUsMjMpKSxQcm9taXNlLnJlc29sdmUoKS50aGVuKG4udC5iaW5kKG4sMzExNzQsMjMpKSxQcm9taXNlLnJlc29sdmUoKS50aGVuKG4udC5iaW5kKG4sMTI2MiwyMykpLFByb21pc2UucmVzb2x2ZSgpLnRoZW4obi50LmJpbmQobiw0NjMxMCwyMykpLFByb21pc2UucmVzb2x2ZSgpLnRoZW4obi50LmJpbmQobiwxNDA3MCwyMykpLFByb21pc2UucmVzb2x2ZSgpLnRoZW4obi50LmJpbmQobiw2NzMzMiwyMykpLFByb21pc2UucmVzb2x2ZSgpLnRoZW4obi5iaW5kKG4sNTAzMjYpKX19LGU9Pnt2YXIgcz1zPT5lKGUucz1zKTtlLk8oMCxbNjgyLDY1MF0sKCk9PihzKDgwNzQpLHMoODU4MTUpKSksX05fRT1lLk8oKX1dKTs=",    //
+     760, //
+     "application/javascript", //
+     "/_next/static/chunks/main-app-6e54874fd7882030.js/", //
+     
+};
+}

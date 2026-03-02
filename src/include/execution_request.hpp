@@ -18,12 +18,21 @@ namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
 using namespace duckdb_yyjson;          // NOLINT(*-build-using-namespace)
 
+// Compatibility layer for httplib multipart API changes starting from 1.4.5
+#if DUCKDB_VERSION_CODE > 10404
+using MultipartFiles = FormFiles;
+#define HTTPLIB_NEW_MULTIPART_API 1
+#else
+using MultipartFiles = MultipartFormDataMap;
+#define HTTPLIB_NEW_MULTIPART_API 0
+#endif
+
 struct ExecutionRequest {
 	const std::string query {};
 	const ResponseFormat format = ResponseFormat::INVALID;
-	const MultipartFormDataMap &files;
+	const MultipartFiles &files;
 
-	ExecutionRequest(const std::string &query, const ResponseFormat format, const MultipartFormDataMap &files)
+	ExecutionRequest(const std::string &query, const ResponseFormat format, const MultipartFiles &files)
 	    : query(query), format(format), files(files) {
 	}
 
@@ -110,7 +119,28 @@ struct ExecutionRequest {
 
 private:
 
-	static Result<std::pair<std::string, const MultipartFormDataMap &>> GetRequestBody(const Request &req) {
+	static Result<std::pair<std::string, const MultipartFiles &>> GetRequestBody(const Request &req) {
+#if HTTPLIB_NEW_MULTIPART_API
+		if (req.is_multipart_form_data()) {
+			if (!req.form.has_file("query.json")) {
+				return HttpErrorData {BadRequest_400, "Missing 'query.json' file"};
+			}
+
+			// Make sure that the files does not have multiple values
+			for (auto it = req.form.files.begin(); it != req.form.files.end();) {
+				auto count = req.form.files.count(it->first);
+				if (count > 1) {
+					return HttpErrorData {BadRequest_400, "Multiple files with name: " + it->first};
+				}
+				std::advance(it, count);
+			}
+
+			return std::make_pair(req.form.get_file("query.json").content, std::ref(req.form.files));
+		} else {
+			static const MultipartFiles empty_files;
+			return std::make_pair(req.body, std::ref(empty_files));
+		}
+#else
 		if (req.is_multipart_form_data()) {
 			if (!req.has_file("query.json")) {
 				return HttpErrorData {BadRequest_400, "Missing 'query.json' file"};
@@ -129,9 +159,10 @@ private:
 		} else {
 			return std::make_pair(req.body, std::ref(req.files));
 		}
+#endif
 	}
 
-	static Result<ExecutionRequest> ParseQuery(const std::string &request_str, const MultipartFormDataMap &files) {
+	static Result<ExecutionRequest> ParseQuery(const std::string &request_str, const MultipartFiles &files) {
 		constexpr yyjson_read_flag flags = YYJSON_READ_ALLOW_TRAILING_COMMAS | YYJSON_READ_ALLOW_INF_AND_NAN;
 		yyjson_doc *doc = yyjson_read(request_str.c_str(), request_str.size(), flags);
 		if (!doc) {

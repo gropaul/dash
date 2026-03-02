@@ -59,6 +59,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	}
 
 	const string query = input.inputs[0].GetValue<string>();
+
 	Connection conn(*context.db);
 	auto result = conn.Query(query);
 
