@@ -238,7 +238,7 @@ std::vector<File> files = {
 	%content%
 };
 
-optional_ptr<File> GetFile(Path path, const bool try_resolve_404) {
+optional_ptr<File> GetFile(std::string path, const bool try_resolve_404) {
 	if (path.empty() || path == "/") {
 		path = "index.html";
 	}
