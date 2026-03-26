@@ -58,17 +58,6 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 
 	Connection conn(*context.db);
 
-	std::atomic<bool> query_done{false};
-	std::thread interrupt_watcher([&]() {
-		while (!query_done.load()) {
-			if (context.interrupted) {
-				conn.Interrupt();
-				break;
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
-		}
-	});
-
 	// Extract all statements and execute them, returning only the last result
 	auto statements = conn.ExtractStatements(query);
 	if (statements.empty()) {
@@ -83,17 +72,21 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 		}
 
 		auto pending = conn.PendingQuery(std::move(statements[i]));
+		PendingExecutionResult status;
+		do {
+			status = pending->ExecuteTask();
+			if (context.interrupted) {
+				conn.Interrupt();
+				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
+			}
+		} while (!PendingQueryResult::IsResultReady(status) &&
+		         status != PendingExecutionResult::EXECUTION_ERROR);
 		auto query_result = pending->Execute();
 		if (query_result->HasError()) {
-			query_done.store(true);
-			interrupt_watcher.join();
 			throw Exception(query_result->GetErrorObject().Type(), query_result->GetErrorObject().RawMessage());
 		}
 		result = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(query_result));
 	}
-
-	query_done.store(true);
-	interrupt_watcher.join();
 
 	for (int col_idx = 0; col_idx < result->ColumnCount(); col_idx ++) {
 		return_types.push_back(result->types[col_idx]);
