@@ -5,10 +5,6 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
 
-#include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
-
-#include <iomanip> // for std::fixed and std::setprecision
-
 namespace duckdb {
 struct QueryResultFunctionData final : FunctionData {
 
@@ -61,11 +57,43 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	const string query = input.inputs[0].GetValue<string>();
 
 	Connection conn(*context.db);
-	auto result = conn.Query(query);
 
-	if (result->HasError()) {
-		throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
+	std::atomic<bool> query_done{false};
+	std::thread interrupt_watcher([&]() {
+		while (!query_done.load()) {
+			if (context.interrupted) {
+				conn.Interrupt();
+				break;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
+	});
+
+	// Extract all statements and execute them, returning only the last result
+	auto statements = conn.ExtractStatements(query);
+	if (statements.empty()) {
+		throw Exception(ExceptionType::PARSER, "No statements found in query");
 	}
+
+	unique_ptr<MaterializedQueryResult> result;
+	for (idx_t i = 0; i < statements.size(); i++) {
+		// Skip SELECT statements that aren't the last statement (they have no side effects)
+		if (statements[i]->type == StatementType::SELECT_STATEMENT && i != statements.size() - 1) {
+			continue;
+		}
+
+		auto pending = conn.PendingQuery(std::move(statements[i]));
+		auto query_result = pending->Execute();
+		if (query_result->HasError()) {
+			query_done.store(true);
+			interrupt_watcher.join();
+			throw Exception(query_result->GetErrorObject().Type(), query_result->GetErrorObject().RawMessage());
+		}
+		result = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(query_result));
+	}
+
+	query_done.store(true);
+	interrupt_watcher.join();
 
 	for (int col_idx = 0; col_idx < result->ColumnCount(); col_idx ++) {
 		return_types.push_back(result->types[col_idx]);

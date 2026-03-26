@@ -7,7 +7,6 @@
 
 namespace duckdb {
 
-typedef std::string Path;
 typedef unsigned char Byte;
 
 struct File {
@@ -17,6 +16,6 @@ struct File {
 	std::string path;
 };
 
-optional_ptr<File> GetFile(Path path, bool try_resolve_404 = true);
+optional_ptr<File> GetFile(std::string path, bool try_resolve_404 = true);
 
 } // namespace duckdb
