@@ -1,7 +1,10 @@
 # Dash
 https://github.com/user-attachments/assets/96f3f4fb-1f53-4113-b1d5-d55934c865e0
 
+[![Discord](https://img.shields.io/discord/1491791731119755505?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/KUsDdkeG5G)
+
 ## Getting started
+
 
 
 
