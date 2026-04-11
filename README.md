@@ -1,20 +1,36 @@
-# Dash
-https://github.com/user-attachments/assets/96f3f4fb-1f53-4113-b1d5-d55934c865e0
 
-## Getting started
+## What is Dash?
+Dash is a local-first SQL workbench built on top of DuckDB. Query your data, explore schemas, and visualize results — all without leaving your terminal or sending data to a server.
 
+### Features
+- 🌐 **Runs in the browser** — no server, no data leaves your machine
+- 📊 **Visualize results** — charts and tables out of the box
+- 🔓 **Open-source** — MIT licensed
+- 🎨 **Interactive Canvas** — build and arrange queries and visualizations freely on a canvas
+- 🦆 **Powered by DuckDB** — fast, embedded, zero-config
+  
+[![Discord](https://discordapp.com/api/guilds/1491791731119755505/widget.png?style=banner3)](https://discord.gg/KUsDdkeG5G)
 
+## Getting Started
 
+You can use Dash straight from the browser (👉 https://app.dash.builders/) or install it as a DuckDB community extension:
 
-### Installation
-
-```sql
+```
 FROM community INSTALL dash;
 LOAD dash;
 PRAGMA dash;
 ```
 
-### Usage
+That's it. Dash opens directly from within DuckDB.
+
+## Community & Support
+Have a question, found a bug, or want to share feedback? Join us on [Discord](https://discord.gg/KUsDdkeG5G) or open an issue on GitHub.
+
+### Demo Video
+
+https://github.com/user-attachments/assets/96f3f4fb-1f53-4113-b1d5-d55934c865e0
+
+### Advanced Usage
 
 ```sql
 -- Starts the http server
