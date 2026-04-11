@@ -41,6 +41,51 @@ static bool PrecedingStatementsAreReadOnly(ClientContext &context, const vector<
 	return true;
 }
 
+
+static unique_ptr<SubqueryRef> ParseSubquery(const string &query, const ParserOptions &options, const string &err_msg) {
+	Parser parser(options);
+	parser.ParseQuery(query);
+	if (parser.statements.size() != 1) {
+		throw ParserException(err_msg);
+	}
+
+	auto &stmt = parser.statements[0];
+
+	if (stmt->type == StatementType::SELECT_STATEMENT) {
+		// Regular SELECT statement
+		auto select_stmt = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(stmt));
+		return duckdb::make_uniq<SubqueryRef>(std::move(select_stmt));
+	} else if (stmt->type == StatementType::MULTI_STATEMENT) {
+		// MultiStatement (e.g., from PIVOT statements that create enum types)
+		throw ParserException(
+			"PIVOT statements without explicit IN clauses are not supported in query() function. "
+			"Please specify the pivot values explicitly, e.g.: PIVOT ... ON col IN (val1, val2, ...)");
+	} else {
+		throw ParserException(err_msg);
+	}
+}
+
+// Execute all but the last statement in `statements` on `conn`, with interrupt checking.
+static void ExecutePrecedingStatements(Connection &conn, ClientContext &context,
+                                       const vector<unique_ptr<SQLStatement>> &statements) {
+	for (idx_t i = 0; i < statements.size() - 1; i++) {
+		auto pending = conn.PendingQuery(statements[i]->query);
+		PendingExecutionResult status;
+		do {
+			status = pending->ExecuteTask();
+			if (context.interrupted) {
+				conn.Interrupt();
+				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
+			}
+		} while (!PendingQueryResult::IsResultReady(status) &&
+		         status != PendingExecutionResult::EXECUTION_ERROR);
+		auto result = pending->Execute();
+		if (result->HasError()) {
+			throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
+		}
+	}
+}
+
 // bind_replace: return a SubqueryRef when the last statement is a SELECT and
 // preceding statements (if any) are read-only. This lets the optimizer work on
 // the query (filter pushdown, projection pruning, joins, LIMIT, etc.).
@@ -67,20 +112,15 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 	}
 
 	auto &last = parser.statements.back();
-	if (last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(context, parser.statements)) {
+	if (false && last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(context, parser.statements)) {
 		// Safe to execute preceding read-only statements on a separate connection
 		// and return the last SELECT as a SubqueryRef
 		if (parser.statements.size() > 1) {
 			Connection conn(*context.db);
-			for (idx_t i = 0; i < parser.statements.size() - 1; i++) {
-				auto result = conn.Query(parser.statements[i]->query);
-				if (result->HasError()) {
-					throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
-				}
-			}
+			ExecutePrecedingStatements(conn, context, parser.statements);
 		}
-		auto select_stmt = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(last));
-		return make_uniq<SubqueryRef>(std::move(select_stmt));
+		auto subquery_ref = ParseSubquery(query, context.GetParserOptions(), "Expected a single SELECT statement");
+		return std::move(subquery_ref);
 	}
 
 	// Preceding statements modify catalog/data, or last is not SELECT — fall through
@@ -149,22 +189,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	}
 
 	// Execute preceding statements
-	for (idx_t i = 0; i < statements.size() - 1; i++) {
-		auto preceding = conn.PendingQuery(std::move(statements[i]));
-		PendingExecutionResult pstatus;
-		do {
-			pstatus = preceding->ExecuteTask();
-			if (context.interrupted) {
-				conn.Interrupt();
-				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
-			}
-		} while (!PendingQueryResult::IsResultReady(pstatus) &&
-		         pstatus != PendingExecutionResult::EXECUTION_ERROR);
-		auto presult = preceding->Execute();
-		if (presult->HasError()) {
-			throw Exception(presult->GetErrorObject().Type(), presult->GetErrorObject().RawMessage());
-		}
-	}
+	ExecutePrecedingStatements(conn, context, statements);
 
 	// Execute the last statement
 	auto pending = conn.PendingQuery(std::move(statements.back()));

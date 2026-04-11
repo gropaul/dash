@@ -64,7 +64,7 @@ struct ExecutionRequest {
 		const string escaped_query = EscapeQutes(query);
 
 		const std::string query_template = R"(
-		    WITH data AS MATERIALIZED (
+		    WITH data AS (
 		        FROM query_result('{}')
 		    ),
 			dash_row_number_ids AS (
@@ -72,21 +72,21 @@ struct ExecutionRequest {
 			        FROM range((SELECT COUNT(*) FROM data))
 			),
 			json_data AS (
-			        SELECT dash_row_number_ids.dash_row_number_id, to_json(COLUMNS(c -> c != 'dash_row_number_id'))
+                    SELECT dash_row_number_ids.dash_row_number_id, to_json(COLUMNS(* EXCLUDE (dash_row_number_id)))
 			        FROM data
 			        POSITIONAL JOIN dash_row_number_ids
 			),
-			json_list AS MATERIALIZED (
-			        SELECT ifnull(list([*COLUMNS(c -> c != 'dash_row_number_id')] ORDER BY dash_row_number_id), []) as data
+			json_list AS (
+			        SELECT ifnull(list([*COLUMNS(* EXCLUDE (dash_row_number_id))] ORDER BY dash_row_number_id), []) as data
 			        FROM json_data
 			),
 		    types_data AS (SELECT ANY_VALUE(typeof(COLUMNS(*))) FROM data),
-			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, list_filter(types_with_null, x -> x is not null) as types FROM types_data),
+			types_list_data AS (SELECT [(*COLUMNS(*))] as types_with_null, list_filter(types_with_null, lambda x : x is not null) as types FROM types_data),
 			names_data AS (SELECT ANY_VALUE(alias(COLUMNS(*))) FROM data),
-			names_list_data AS (SELECT [(*COLUMNS(*))] as names_with_null, list_filter(names_with_null, x -> x is not null) as names FROM names_data),
+			names_list_data AS (SELECT [(*COLUMNS(*))] as names_with_null, list_filter(names_with_null, lambda x : x is not null) as names FROM names_data),
 
 			combined_data AS (
-				SELECT data as rows, list_transform(list_zip(types, names), x -> {{type: x[1], name: x[2]}}) as columns, names
+				SELECT data as rows, list_transform(list_zip(types, names), lambda x : {{type: x[1], name: x[2]}}) as columns, names
 				FROM json_list
 				POSITIONAL JOIN types_list_data
 				POSITIONAL JOIN names_list_data
@@ -95,6 +95,7 @@ struct ExecutionRequest {
 			FROM combined_data
 
 		)";
+		printf("Executing query: %s\n", escaped_query.c_str());
 		const string json_query = duckdb_fmt::format(query_template, escaped_query);
 
 		auto result = conn.Query(json_query);

@@ -1,0 +1,13 @@
+
+#pragma once
+#include "files.hpp"
+namespace duckdb {
+const File FILE_TEST__NEXT_TEST__PAGE__TXT = {
+     // Content
+     "MToiJFNyZWFjdC5mcmFnbWVudCIKMjpJWzQ3MDgzLFtdLCJDbGllbnRQYWdlUm9vdCJdCjM6SVszOTQxNyxbIjE5NiIsInN0YXRpYy9jaHVua3MvMTk2LWM1NmMzNDgzMDhiODE0ZjEuanMiLCI0NDUiLCJzdGF0aWMvY2h1bmtzLzQ0NS00YmQwMGEwMmNmZTY5MGViLmpzIiwiMTEiLCJzdGF0aWMvY2h1bmtzL2FwcC90ZXN0L3BhZ2UtZmI2YTVhNTk5NzFmYWQ1YS5qcyJdLCJkZWZhdWx0Il0KNjpJWzM1MTcxLFtdLCJPdXRsZXRCb3VuZGFyeSJdCjc6IiRTcmVhY3Quc3VzcGVuc2UiCjA6eyJyc2MiOlsiJCIsIiQxIiwiYyIseyJjaGlsZHJlbiI6W1siJCIsIiRMMiIsbnVsbCx7IkNvbXBvbmVudCI6IiQzIiwic2VydmVyUHJvdmlkZWRQYXJhbXMiOnsic2VhcmNoUGFyYW1zIjp7fSwicGFyYW1zIjp7fSwicHJvbWlzZXMiOlsiJEA0IiwiJEA1Il19fV0sbnVsbCxbIiQiLCIkTDYiLG51bGwseyJjaGlsZHJlbiI6WyIkIiwiJDciLG51bGwseyJuYW1lIjoiTmV4dC5NZXRhZGF0YU91dGxldCIsImNoaWxkcmVuIjoiJEA4In1dfV1dfV0sImlzUGFydGlhbCI6ZmFsc2UsInN0YWxlVGltZSI6MzAwLCJ2YXJ5UGFyYW1zIjpudWxsLCJidWlsZElkIjoiNEZYaE04MG1mQlhRWktrUUs5b0ZmIn0KNDp7fQo1OiIkMDpyc2M6cHJvcHM6Y2hpbGRyZW46MDpwcm9wczpzZXJ2ZXJQcm92aWRlZFBhcmFtczpwYXJhbXMiCjg6bnVsbAo=",    //
+     920, //
+     "text/plain", //
+     "/test/__next.test.__PAGE__.txt/", //
+     
+};
+}
