@@ -65,6 +65,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	}
 
 	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
+	query_result.bind_replace = QueryResultBindReplace;
 	loader.RegisterFunction(query_result);
 	conn.Commit();
 }
@@ -124,6 +125,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 }
 
 	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
+	query_result.bind_replace = QueryResultBindReplace;
 	ExtensionUtil::RegisterFunction(instance, query_result);
 	conn.Commit();
 }

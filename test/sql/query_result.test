@@ -1,0 +1,159 @@
+# name: test/sql/query_result.test
+# description: test query_result() table function
+# group: [dash]
+
+require dash
+
+# basic single SELECT (bind_replace path — returned as SubqueryRef)
+query I
+SELECT * FROM query_result('SELECT 42');
+----
+42
+
+query III
+FROM query_result('SELECT 1, 2, 3');
+----
+1	2	3
+
+query I
+FROM query_result('SELECT 10 + 32');
+----
+42
+
+# multi-statement: CREATE TABLE then SELECT
+query I
+FROM query_result('CREATE TABLE qr_test1 (a INT, b INT); INSERT INTO qr_test1 VALUES (1, 2), (3, 4); SELECT sum(a) + sum(b) FROM qr_test1');
+----
+10
+
+# verify the table was actually created by the preceding statements
+query II
+SELECT * FROM qr_test1 ORDER BY a;
+----
+1	2
+3	4
+
+# multi-statement: multiple setup statements then SELECT
+query I
+FROM query_result('CREATE TABLE qr_test2 (x INT); INSERT INTO qr_test2 VALUES (10); INSERT INTO qr_test2 VALUES (20); SELECT sum(x) FROM qr_test2');
+----
+30
+
+# multi-statement: CREATE VIEW then SELECT from it
+query I
+FROM query_result('CREATE VIEW qr_view AS SELECT 99 AS val; SELECT val FROM qr_view');
+----
+99
+
+# single non-SELECT statement (fallback bind path)
+query I
+FROM query_result('CREATE TABLE qr_test3 (i INT)');
+----
+
+# INSERT as last statement
+query I
+FROM query_result('INSERT INTO qr_test3 VALUES (1), (2), (3)');
+----
+3
+
+# verify the insert worked
+query I
+SELECT sum(i) FROM qr_test3;
+----
+6
+
+# multi-statement with non-SELECT last statement
+query I
+FROM query_result('CREATE TABLE qr_test4 (v VARCHAR); INSERT INTO qr_test4 VALUES (''hello''), (''world'')');
+----
+2
+
+query I
+SELECT count(*) FROM qr_test4;
+----
+2
+
+# SELECT with filter pushdown opportunity (optimizer can work on SubqueryRef)
+query II
+SELECT * FROM query_result('SELECT * FROM qr_test1') WHERE a = 3;
+----
+3	4
+
+# SELECT with join (optimizer can plan across the subquery boundary)
+query II
+SELECT t1.a, t2.x FROM query_result('SELECT * FROM qr_test1') t1, query_result('SELECT * FROM qr_test2') t2 WHERE t1.a = 1 AND t2.x = 10;
+----
+1	10
+
+# empty result
+query I
+FROM query_result('SELECT 1 WHERE false');
+----
+
+# error: no statements
+statement error
+FROM query_result('');
+----
+No statements found in query
+
+# error: NULL argument
+statement error
+FROM query_result(NULL);
+----
+
+# error: no arguments
+statement error
+FROM query_result();
+----
+
+# multi-statement: skip intermediate SELECTs (they have no side effects)
+query I
+FROM query_result('CREATE TABLE qr_test5 (i INT); SELECT 999; INSERT INTO qr_test5 VALUES (42); SELECT i FROM qr_test5');
+----
+42
+
+# DELETE as last statement
+query I
+FROM query_result('DELETE FROM qr_test5');
+----
+1
+
+# UPDATE as last statement
+statement ok
+INSERT INTO qr_test5 VALUES (1), (2), (3);
+
+query I
+FROM query_result('UPDATE qr_test5 SET i = i * 10');
+----
+3
+
+query I
+SELECT sum(i) FROM qr_test5;
+----
+60
+
+# DROP as preceding statement
+query I
+FROM query_result('DROP TABLE IF EXISTS qr_test5; SELECT 1');
+----
+1
+
+statement error
+SELECT * FROM qr_test5;
+----
+
+# cleanup
+statement ok
+DROP TABLE IF EXISTS qr_test1;
+
+statement ok
+DROP TABLE IF EXISTS qr_test2;
+
+statement ok
+DROP TABLE IF EXISTS qr_test3;
+
+statement ok
+DROP TABLE IF EXISTS qr_test4;
+
+statement ok
+DROP VIEW IF EXISTS qr_view;
