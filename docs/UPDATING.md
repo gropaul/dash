@@ -10,6 +10,11 @@ as follows:
   - `duckdb_version` input in `duckdb-stable-build` job in `MainDistributionPipeline.yml` should be set to latest tagged release
   - `duckdb_version` input in `duckdb-stable-deploy` job in `MainDistributionPipeline.yml` should be set to latest tagged release
   - the reusable workflow `duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml` for the `duckdb-stable-build` job should be set to latest tagged release
+- Push your commits and tags — tags are local by default and must be pushed explicitly for CI to pick them up:
+  ```bash
+  git push origin main
+  git push origin v1.2.3
+  ```
 
 # API changes
 DuckDB extensions built with this extension template are built against the internal C++ API of DuckDB. This API is not guaranteed to be stable.

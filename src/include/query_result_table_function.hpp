@@ -9,6 +9,14 @@
 
 namespace duckdb {
 
+static bool ClientContextIsInterrupted(ClientContext &context) {
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(1, 5, 3)
+	return context.IsInterrupted();
+#else
+	return context.interrupted;
+#endif
+}
+
 // Returns true if a statement type does not modify the catalog or data, meaning
 // it's safe to execute on a separate connection without affecting SubqueryRef
 // binding on the main transaction (which can't see DDL/DML from other transactions
@@ -73,7 +81,7 @@ static void ExecutePrecedingStatements(Connection &conn, ClientContext &context,
 		PendingExecutionResult status;
 		do {
 			status = pending->ExecuteTask();
-			if (context.interrupted) {
+			if (ClientContextIsInterrupted(context)) {
 				conn.Interrupt();
 				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
 			}
@@ -196,7 +204,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	PendingExecutionResult status;
 	do {
 		status = pending->ExecuteTask();
-		if (context.interrupted) {
+		if (ClientContextIsInterrupted(context)) {
 			conn.Interrupt();
 			throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
 		}
