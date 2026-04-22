@@ -112,7 +112,7 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 	}
 
 	auto &last = parser.statements.back();
-	if (false && last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(context, parser.statements)) {
+	if (last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(context, parser.statements)) {
 		// Safe to execute preceding read-only statements on a separate connection
 		// and return the last SELECT as a SubqueryRef
 		if (parser.statements.size() > 1) {

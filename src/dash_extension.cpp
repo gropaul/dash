@@ -17,6 +17,7 @@
 #include "include/table_functions.hpp"
 #endif
 #include "query_result_table_function.hpp"
+#include "include/setup.hpp"
 
 #if DUCKDB_CURRENT_VERSION < DUCKDB_VERSION_ENCODE(1, 3, 3)
 #include "duckdb/main/extension_util.hpp"
@@ -33,6 +34,7 @@ namespace duckdb {
 
 static void LoadInternal(ExtensionLoader &loader) {
 	Connection conn(loader.GetDatabaseInstance());
+	AttachDashDatabase(loader.GetDatabaseInstance(), conn);
 	conn.BeginTransaction();
 #ifndef EMSCRIPTEN
 	{
@@ -57,7 +59,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	{
 
 		const pragma_query_t PragmaDash = [](ClientContext &context, const FunctionParameters &type) -> string {
-			return "CALL start_dash('localhost', 4200, api_key=CAST(CAST(round(random() * 1000000) AS INT) AS String), enable_cors=False, open_browser=True)";
+			return "CALL start_dash('localhost', 4200, enable_cors=False, open_browser=True)";
 		};
 
 		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
@@ -92,6 +94,7 @@ extern "C" {
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection conn(instance);
+	AttachDashDatabase(instance, conn);
 	conn.BeginTransaction();
 #ifndef EMSCRIPTEN
 	{

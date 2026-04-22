@@ -95,7 +95,6 @@ struct ExecutionRequest {
 			FROM combined_data
 
 		)";
-		printf("Executing query: %s\n", escaped_query.c_str());
 		const string json_query = duckdb_fmt::format(query_template, escaped_query);
 
 		auto result = conn.Query(json_query);
