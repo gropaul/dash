@@ -11,7 +11,11 @@ static void AttachDashDatabase(DatabaseInstance &db, Connection &conn) {
 	if (home_dir.empty()) {
 		return;
 	}
-	auto dash_dir = fs.JoinPath(home_dir, ".duckdb", "extension_data", "dash");
+	// DuckDB v1.4.4's FileSystem::JoinPath does not support joining 4+ components in a single call.
+	// Build the path incrementally for compatibility across DuckDB versions.
+	auto dash_dir = fs.JoinPath(home_dir, ".duckdb");
+	dash_dir = fs.JoinPath(dash_dir, "extension_data");
+	dash_dir = fs.JoinPath(dash_dir, "dash");
 	if (!fs.DirectoryExists(dash_dir)) {
 		fs.CreateDirectoriesRecursive(dash_dir);
 	}
