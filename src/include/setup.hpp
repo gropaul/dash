@@ -20,7 +20,7 @@ static void AttachDashDatabase(DatabaseInstance &db, Connection &conn) {
 		fs.CreateDirectoriesRecursive(dash_dir);
 	}
 	auto dash_db_path = fs.JoinPath(dash_dir, "dash.duckdb");
-	conn.Query("ATTACH IF NOT EXISTS '" + dash_db_path + "' AS dash");
+	conn.Query("ATTACH IF NOT EXISTS '" + dash_db_path + "' AS dash (READ_WRITE)");
 }
 
 } // namespace duckdb
