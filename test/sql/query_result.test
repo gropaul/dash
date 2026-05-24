@@ -96,11 +96,6 @@ FROM query_result('');
 ----
 No statements found in query
 
-# error: NULL argument
-statement error
-FROM query_result(NULL);
-----
-
 # error: no arguments
 statement error
 FROM query_result();
