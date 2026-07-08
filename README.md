@@ -1,6 +1,6 @@
 
 ## What is Dash?
-Dash is a local-first SQL workbench built on top of DuckDB. Query your data, explore schemas, and visualize results — all without leaving your terminal or sending data to a server.
+Dash is a local-first SQL workbench built on top of DuckDB. Query your data, explore schemas, and visualize results.
 
 ### Features
 - 🌐 **Runs in the browser** — no server, no data leaves your machine
