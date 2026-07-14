@@ -3,11 +3,11 @@
 Dash is a local-first SQL workbench built on top of DuckDB. Query your data, explore schemas, and visualize results.
 
 ### Features
-- 🌐 **Runs in the browser** — no server, no data leaves your machine
-- 📊 **Visualize results** — charts and tables out of the box
-- 🔓 **Open-source** — MIT licensed
-- 🎨 **Interactive Canvas** — build and arrange queries and visualizations freely on a canvas
-- 🦆 **Powered by DuckDB** — fast, embedded, zero-config
+- 🌐 **Runs in the browser** - no server, no data leaves your machine
+- 📊 **Visualize results** - charts and tables out of the box
+- 🔓 **Open-source** - MIT licensed
+- 🎨 **Interactive Canvas** - build and arrange queries and visualizations freely on a canvas
+- 🦆 **Powered by DuckDB** - fast, embedded, zero-config
   
 [![Discord](https://discordapp.com/api/guilds/1491791731119755505/widget.png?style=banner3)](https://discord.gg/KUsDdkeG5G)
 
