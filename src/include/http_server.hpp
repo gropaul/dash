@@ -6,6 +6,7 @@
 #include "files.hpp"
 #include "http_error_data.hpp"
 #include "result.hpp"
+#include "setup.hpp"
 #include "table_functions_bind_data.hpp"
 #include "uri.hpp"
 
@@ -49,9 +50,10 @@ static void openURL(const std::string& url) {
 class DashHttpServer {
 public:
 	DashHttpServer() {
-		server.Post("/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
-		server.Post("/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
-		server.Get("/ping", [](const Request &, Response &res) { res.body = "pong"; });
+		server.Post("/api/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
+		server.Post("/api/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
+		server.Get("/api/ping", [](const Request &, Response &res) { res.body = "pong"; });
+		server.Get("/api/dash-dir", [this](const Request &req, Response &res) { ServeDashDirectory(req, res); });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
 		server.Options(".*", [this](const Request &, Response &res) { AddCorsHeaders(res); });
 	}
@@ -162,6 +164,27 @@ private:
 		// Return success response with count
 		res.status = 200;
 		res.set_content("{\"cancelled\": " + std::to_string(cancelled_count) + "}", "application/json");
+	}
+
+	void ServeDashDirectory(const Request &, Response &res) const {
+		AddCorsHeaders(res);
+
+		auto db = db_instance.lock();
+		if (!db) {
+			res.status = 500;
+			res.set_content("Database not available", "text/plain");
+			return;
+		}
+
+		auto dash_dir = GetDashDirectory(db->GetFileSystem());
+		if (dash_dir.empty()) {
+			res.status = 500;
+			res.set_content("Could not resolve dash directory", "text/plain");
+			return;
+		}
+
+		res.status = 200;
+		res.set_content(dash_dir, "text/plain");
 	}
 
 	void ServeUi(const Request &req, Response &res) const {

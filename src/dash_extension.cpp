@@ -67,6 +67,10 @@ static void LoadInternal(ExtensionLoader &loader) {
 		PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
 		loader.RegisterFunction(dash);
 	}
+	{
+		PragmaFunction dash_home = PragmaFunction::PragmaStatement("dash_home", PragmaDashHome);
+		loader.RegisterFunction(dash_home);
+	}
 
 	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
 	query_result.bind_replace = QueryResultBindReplace;
@@ -127,6 +131,10 @@ static void LoadInternal(DatabaseInstance &instance) {
 	PragmaFunction dash = PragmaFunction::PragmaCall("dash", PragmaDash, {});
 	ExtensionUtil::RegisterFunction(instance, dash);
 
+}
+{
+	PragmaFunction dash_home = PragmaFunction::PragmaStatement("dash_home", PragmaDashHome);
+	ExtensionUtil::RegisterFunction(instance, dash_home);
 }
 
 	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
