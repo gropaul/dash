@@ -16,7 +16,7 @@ Dash is a local-first SQL workbench built on top of DuckDB. Query your data, exp
 You can use Dash straight from the browser (👉 https://app.dash.builders/) or install it as a DuckDB community extension:
 
 ```
-FROM community INSTALL dash;
+INSTALL dash FROM community;
 LOAD dash;
 PRAGMA dash;
 ```
