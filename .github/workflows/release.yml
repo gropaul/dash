@@ -1,0 +1,89 @@
+# Cut a release from a v* tag: build the extension binaries at the tag, create the release, attach
+# them together with the dash-ui release assets of the same tag (desktop installers + web bundle).
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DUCKDB_VERSION: v1.4.4
+
+jobs:
+  check:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reject non-tag refs
+        if: github.ref_type != 'tag'
+        run: |
+          echo "::error::This workflow releases a tag, but it ran on ${{ github.ref_type }} '${{ github.ref_name }}'."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches EXT_VERSION_DASH
+        run: |
+          version=$(sed -n 's/^#define EXT_VERSION_DASH "\(.*\)"/\1/p' src/dash_extension.cpp)
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match EXT_VERSION_DASH $version."
+            exit 1
+          fi
+
+      - name: Check the dash-ui release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$GITHUB_REF_NAME" -R gropaul/dash-ui --json isDraft -q 'if .isDraft then error("dash-ui release is still a draft") else "ok" end'
+
+  extension:
+    name: Build extension binaries
+    needs: check
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.4.4
+    with:
+      duckdb_version: v1.4.4
+      ci_tools_version: v1.4.4
+      extension_name: dash
+
+  publish:
+    name: Publish release
+    needs: extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dash-${{ env.DUCKDB_VERSION }}-extension-*
+          path: extension
+
+      # One artifact per platform, each holding dash.duckdb_extension. Name them by platform.
+      - name: Collect the extension binaries
+        run: |
+          mkdir assets
+          for dir in extension/dash-${DUCKDB_VERSION}-extension-*; do
+            arch=${dir##*-extension-}
+            cp "$dir/dash.duckdb_extension" "assets/dash-${DUCKDB_VERSION}-${arch}.duckdb_extension"
+          done
+          ls -l assets
+
+      - name: Fetch the dash-ui assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$GITHUB_REF_NAME" -R gropaul/dash-ui -D assets
+
+      - name: Create and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi
+          gh release upload "$GITHUB_REF_NAME" assets/* --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false

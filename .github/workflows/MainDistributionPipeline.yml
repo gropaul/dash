@@ -4,6 +4,8 @@
 name: Main Extension Distribution Pipeline
 on:
   push:
+    # tags are built by release.yml, which calls the same pipeline
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
