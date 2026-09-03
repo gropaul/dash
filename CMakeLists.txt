@@ -41,6 +41,12 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
+# DuckDB's httplib (2.0+) loads CA certificates from the macOS keychain
+if(APPLE)
+    target_link_libraries(${EXTENSION_NAME} "-framework CoreFoundation" "-framework Security")
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} "-framework CoreFoundation" "-framework Security")
+endif()
+
 # 5) Make sure the extension depends on the script target
 #add_dependencies(${EXTENSION_NAME} run_my_python_script)
 #add_dependencies(${LOADABLE_EXTENSION_NAME} run_my_python_script)
