@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DUCKDB_VERSION: v1.4.4
+  DUCKDB_VERSION: v1.5.3
 
 jobs:
   check:
@@ -43,13 +43,11 @@ jobs:
   extension:
     name: Build extension binaries
     needs: check
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.4.4
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
     with:
-      duckdb_version: v1.4.4
-      ci_tools_version: v1.4.4
+      duckdb_version: v1.5.3
+      ci_tools_version: v1.5.3
       extension_name: dash
-      # v1.4.4 pins a vcpkg whose OpenSSL port needs an MSYS2 package that no longer exists; use the v1.5 pin
-      vcpkg_commit: 84bab45d415d22042bd0b9081aea57f362da3f35
 
   publish:
     name: Publish release
