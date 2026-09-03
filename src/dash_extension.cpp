@@ -40,7 +40,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	conn.BeginTransaction();
 #ifndef EMSCRIPTEN
 	{
-		TableFunction tf(std::string("start_dash"),
+		TableFunction tf("start_dash",
 		                 {
 		                     LogicalType::VARCHAR, // Host
 		                     LogicalType::INTEGER  // Port
@@ -53,7 +53,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 		loader.RegisterFunction(tf);
 	}{
 
-		TableFunction tf(std::string("stop_dash"), {}, StopHttpServer, BindStopHttpServer,
+		TableFunction tf("stop_dash", {}, StopHttpServer, BindStopHttpServer,
 		                 RunOnceGlobalTableFunctionState::Init);
 		loader.RegisterFunction(tf);
 	}
@@ -104,7 +104,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 	conn.BeginTransaction();
 #ifndef EMSCRIPTEN
 	{
-		TableFunction tf(std::string("start_dash"),
+		TableFunction tf("start_dash",
 						 {
 							 LogicalType::VARCHAR, // Host
 							 LogicalType::INTEGER  // Port
@@ -117,7 +117,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}{
 
-		TableFunction tf(std::string("stop_dash"), {}, StopHttpServer, BindStopHttpServer,
+		TableFunction tf("stop_dash", {}, StopHttpServer, BindStopHttpServer,
 						 RunOnceGlobalTableFunctionState::Init);
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}

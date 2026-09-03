@@ -1,4 +1,5 @@
 #pragma once
+#include "dash_extension.hpp"
 #include "table_functions_bind_data.hpp"
 
 namespace duckdb {
@@ -25,7 +26,7 @@ inline void StartHttpServer(ClientContext &context, TableFunctionInput &data, Da
 }
 
 inline unique_ptr<FunctionData> BindStopHttpServer(ClientContext &, TableFunctionBindInput &,
-                                                   vector<LogicalType> &return_types, vector<string> &names) {
+                                                   vector<LogicalType> &return_types, vector<column_name_t> &names) {
 	return_types.push_back(LogicalType::BOOLEAN);
 	names.push_back("success");
 
@@ -47,8 +48,9 @@ inline void StopHttpServer(ClientContext &context, TableFunctionInput &data, Dat
 template <typename T>
 T GetOrDefault(const TableFunctionBindInput &data, const string &key, T default_value,
                const std::function<void(T &)> &validator = {}) {
-	if (data.named_parameters.find(key) != data.named_parameters.end()) {
-		auto param = data.named_parameters.at(key).GetValue<T>();
+	auto entry = data.named_parameters.find(column_name_t(key));
+	if (entry != data.named_parameters.end()) {
+		auto param = entry->second.GetValue<T>();
 		if (validator) {
 			validator(param);
 		}
@@ -58,7 +60,7 @@ T GetOrDefault(const TableFunctionBindInput &data, const string &key, T default_
 }
 
 inline unique_ptr<FunctionData> BindStartHttpServer(ClientContext &, TableFunctionBindInput &input,
-                                                    vector<LogicalType> &return_types, vector<string> &names) {
+                                                    vector<LogicalType> &return_types, vector<column_name_t> &names) {
 	auto host = input.inputs[0].GetValue<string>();
 	auto port = input.inputs[1].GetValue<uint64_t>();
 

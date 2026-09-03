@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dash_extension.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
@@ -178,7 +179,7 @@ static void QueryResultFun(ClientContext &context, TableFunctionInput &data_p, D
 }
 
 static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFunctionBindInput &input,
-                                                vector<LogicalType> &return_types, vector<string> &names) {
+                                                vector<LogicalType> &return_types, vector<column_name_t> &names) {
 
 	if (input.inputs.size() != 1) {
 		throw Exception(ExceptionType::BINDER, "query_result needs exactly one argument");
@@ -216,9 +217,16 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	}
 	auto result = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(query_result));
 
-	for (int col_idx = 0; col_idx < result->ColumnCount(); col_idx++) {
-		return_types.push_back(result->types[col_idx]);
-		names.push_back(result->names[col_idx]);
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
+	const auto &result_types = result->GetTypes();
+	const auto &result_names = result->GetNames();
+#else
+	const auto &result_types = result->types;
+	const auto &result_names = result->names;
+#endif
+	for (idx_t col_idx = 0; col_idx < result->ColumnCount(); col_idx++) {
+		return_types.push_back(result_types[col_idx]);
+		names.push_back(result_names[col_idx]);
 	}
 
 	auto data = make_uniq<QueryResultFunctionData>(query, std::move(result));
