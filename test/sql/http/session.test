@@ -115,7 +115,7 @@ SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
 # A database attached by one request stays attached for the next one.
 statement ok
 SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
-                             body := '{"query": "ATTACH ''__TEST_DIR__/extra.duckdb'' AS extra", "format": "json"}');
+                             body := '{"query": "ATTACH ''' || replace('__TEST_DIR__', '\', '/') || '/extra.duckdb'' AS extra", "format": "json"}');
 
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',

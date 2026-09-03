@@ -43,7 +43,7 @@ SELECT status FROM dash_http('POST', 'http://127.0.0.1:39003/api/query',
 # write-file is behind the same guard.
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39003/api/write-file',
-                                   body := '{"path": "__TEST_DIR__/unauthorized.txt", "content": "x"}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/unauthorized.txt", "content": "x"}');
 ----
 401	{"exception_type":"HTTP","exception_message":"Missing 'X-Api-Key' header"}
 

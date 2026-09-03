@@ -12,7 +12,7 @@ CALL start_dash('127.0.0.1', 39006);
 
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "hello world"}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/written.txt", "content": "hello world"}');
 ----
 200	<REGEX>:\{"path":".*written\.txt","bytes_written":11,"overwritten":false\}
 
@@ -25,13 +25,13 @@ hello world
 # Writing again over an existing file is refused unless it is asked for.
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "x"}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/written.txt", "content": "x"}');
 ----
 409	<REGEX>:.*File already exists.*allow_override.*
 
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "x", "allow_override": true}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/written.txt", "content": "x", "allow_override": true}');
 ----
 200	<REGEX>:\{"path":".*written\.txt","bytes_written":1,"overwritten":true\}
 
@@ -44,7 +44,7 @@ x
 # Missing parent directories are created.
 query I
 SELECT status FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                             body := '{"path": "__TEST_DIR__/nested/deeper/file.txt", "content": "here"}');
+                             body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/nested/deeper/file.txt", "content": "here"}');
 ----
 200
 
@@ -66,7 +66,7 @@ SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-fil
 
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                                   body := '{"path": "__TEST_DIR__/x.txt"}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/x.txt"}');
 ----
 400	{"exception_type":"HTTP","exception_message":"Expected 'content' field as string"}
 
@@ -78,7 +78,7 @@ SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-fil
 
 query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
-                                   body := '{"path": "__TEST_DIR__", "content": "x"}');
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '", "content": "x"}');
 ----
 400	<REGEX>:.*Path is an existing directory.*
 

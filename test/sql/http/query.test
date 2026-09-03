@@ -91,7 +91,7 @@ query II
 SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
                                    body := '{"query": "SELEKT 1", "format": "json"}');
 ----
-400	<REGEX>:.*syntax error at or near.*SELEKT.*
+400	<REGEX>:.*"exception_type":"Parser".*SELEKT.*
 
 statement ok
 CALL stop_dash();
