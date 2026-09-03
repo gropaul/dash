@@ -1,0 +1,12 @@
+# name: test/sql/dash_home.test
+# description: test the dash_home pragma
+# group: [dash]
+
+require dash
+
+# dash_home returns the dash directory path, which ends in the
+# .duckdb/extension_data/dash suffix.
+query I
+PRAGMA dash_home;
+----
+<REGEX>:.*\.duckdb.*extension_data.*dash

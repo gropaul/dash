@@ -9,6 +9,7 @@
 #include "setup.hpp"
 #include "table_functions_bind_data.hpp"
 #include "uri.hpp"
+#include "write_file_request.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.hpp"
@@ -52,6 +53,7 @@ public:
 	DashHttpServer() {
 		server.Post("/api/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Post("/api/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
+		server.Post("/api/write-file", [this](const Request &req, Response &res) { WriteFile(req, res); });
 		server.Get("/api/ping", [](const Request &, Response &res) { res.body = "pong"; });
 		server.Get("/api/dash-dir", [this](const Request &req, Response &res) { ServeDashDirectory(req, res); });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
@@ -134,6 +136,22 @@ private:
 		RETURN_IF_ERROR_CB(execution_request, ([&res](const HttpErrorData &error) { RespondError(error, res); }))
 		auto execution_error = execution_request->Execute(db_instance.lock(), res);
 		RETURN_IF_ERROR_CB(execution_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+	}
+
+	void WriteFile(const Request &req, Response &res) const {
+		AddCorsHeaders(res);
+
+		auto write_file_request = WriteFileRequest::FromRequest(req, api_key);
+		RETURN_IF_ERROR_CB(write_file_request, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+
+		auto db = db_instance.lock();
+		if (!db) {
+			RespondError(HttpErrorData {InternalServerError_500, "Database not available"}, res);
+			return;
+		}
+
+		auto write_error = write_file_request->Execute(db, res);
+		RETURN_IF_ERROR_CB(write_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
 	}
 
 	void CancelAllQueries(const Request &req, Response &res) const {
