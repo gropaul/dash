@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DUCKDB_VERSION: v1.5.3
+  DUCKDB_VERSION: v1.5.5
 
 jobs:
   check:
@@ -43,10 +43,10 @@ jobs:
   extension:
     name: Build extension binaries
     needs: check
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.5
     with:
-      duckdb_version: v1.5.3
-      ci_tools_version: v1.5.3
+      duckdb_version: v1.5.5
+      ci_tools_version: v1.5.5
       extension_name: dash
 
   publish:
