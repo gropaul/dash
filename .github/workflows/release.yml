@@ -62,13 +62,16 @@ jobs:
           pattern: dash-${{ env.DUCKDB_VERSION }}-extension-*
           path: extension
 
-      # One artifact per platform, each holding dash.duckdb_extension. Name them by platform.
+      # One artifact per platform, holding dash.duckdb_extension (or .duckdb_extension.wasm for
+      # the WASM targets). Name them by platform, keeping the extension.
       - name: Collect the extension binaries
         run: |
           mkdir assets
-          for dir in extension/dash-${DUCKDB_VERSION}-extension-*; do
+          for file in extension/dash-${DUCKDB_VERSION}-extension-*/*; do
+            dir=${file%/*}
             arch=${dir##*-extension-}
-            cp "$dir/dash.duckdb_extension" "assets/dash-${DUCKDB_VERSION}-${arch}.duckdb_extension"
+            name=${file##*/}
+            cp "$file" "assets/dash-${DUCKDB_VERSION}-${arch}.${name#*.}"
           done
           ls -l assets
 
