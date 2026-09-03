@@ -1,0 +1,63 @@
+# name: test/sql/http/cors.test
+# description: the CORS headers behind enable_cors
+# group: [dash]
+
+require dash
+
+require json
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39004, enable_cors := true);
+
+query IIIII
+SELECT headers['Access-Control-Allow-Origin'],
+       headers['Access-Control-Allow-Methods'],
+       headers['Access-Control-Allow-Headers'],
+       headers['Access-Control-Allow-Credentials'],
+       headers['Access-Control-Max-Age']
+FROM dash_http('POST', 'http://127.0.0.1:39004/api/query',
+               body := '{"query": "SELECT 1", "format": "json"}');
+----
+*	POST, GET, OPTIONS	X-Api-Key, Content-Type	true	86400
+
+# The preflight is answered with the same headers.
+query II
+SELECT status, headers['Access-Control-Allow-Origin']
+FROM dash_http('OPTIONS', 'http://127.0.0.1:39004/api/query');
+----
+200	*
+
+# An error response carries them too, so the browser can read the error.
+query II
+SELECT status, headers['Access-Control-Allow-Origin']
+FROM dash_http('POST', 'http://127.0.0.1:39004/api/query', body := 'not json');
+----
+400	*
+
+statement ok
+CALL stop_dash();
+
+# Without enable_cors, none of them are set.
+statement ok
+CALL start_dash('127.0.0.1', 39005);
+
+query III
+SELECT headers['Access-Control-Allow-Origin'] IS NULL,
+       headers['Access-Control-Allow-Methods'] IS NULL,
+       headers['Access-Control-Allow-Credentials'] IS NULL
+FROM dash_http('POST', 'http://127.0.0.1:39005/api/query',
+               body := '{"query": "SELECT 1", "format": "json"}');
+----
+true	true	true
+
+query II
+SELECT status, headers['Access-Control-Allow-Origin'] IS NULL
+FROM dash_http('OPTIONS', 'http://127.0.0.1:39005/api/query');
+----
+200	true
+
+statement ok
+CALL stop_dash();

@@ -1,0 +1,47 @@
+# name: test/sql/http/file_upload.test
+# description: files uploaded with a query become temp tables named after the file
+# group: [dash]
+
+require dash
+
+require json
+
+require parquet
+
+statement ok
+CALL stop_dash();
+
+statement ok
+COPY (SELECT range AS i FROM range(42)) TO '__TEST_DIR__/range.parquet' (FORMAT parquet);
+
+statement ok
+COPY (SELECT 'a' AS s) TO '__TEST_DIR__/letters.csv' (FORMAT csv, HEADER);
+
+statement ok
+CALL start_dash('127.0.0.1', 39007);
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/query',
+                                   files := ['__TEST_DIR__/range.parquet'],
+                                   body := '{"query": "SELECT count(*) AS n FROM ''range.parquet''", "format": "json"}');
+----
+200	{"rows":[[42]],"columns":[{"type":"BIGINT","name":"n"}],"stats":{"rows":1}}
+
+# Two files in one request, joined against each other.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/query',
+                                   files := ['__TEST_DIR__/range.parquet', '__TEST_DIR__/letters.csv'],
+                                   body := '{"query": "SELECT s, count(*) AS n FROM ''range.parquet'', ''letters.csv'' GROUP BY s", "format": "json"}');
+----
+200	{"rows":[["a",42]],"columns":[{"type":"VARCHAR","name":"s"},{"type":"BIGINT","name":"n"}],"stats":{"rows":1}}
+
+# Uploading the same name again replaces the table instead of failing on the second request.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/query',
+                                   files := ['__TEST_DIR__/range.parquet'],
+                                   body := '{"query": "SELECT max(i) AS m FROM ''range.parquet''", "format": "json"}');
+----
+200	{"rows":[[41]],"columns":[{"type":"BIGINT","name":"m"}],"stats":{"rows":1}}
+
+statement ok
+CALL stop_dash();

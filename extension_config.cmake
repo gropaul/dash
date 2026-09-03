@@ -6,5 +6,5 @@ duckdb_extension_load(dash
     LOAD_TESTS
 )
 
-# Any extra extensions that should be built
-# e.g.: duckdb_extension_load(json)
+# The /api/query endpoint serializes results with to_json, so the tests need json.
+duckdb_extension_load(json)

@@ -1,0 +1,56 @@
+# name: test/sql/http/server.test
+# description: the endpoints that need no request body, served over HTTP
+# group: [dash]
+
+require dash
+
+# A server left running by an earlier test file would make start_dash throw.
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39001);
+
+query II
+SELECT status, body FROM dash_http('GET', 'http://127.0.0.1:39001/api/ping');
+----
+200	pong
+
+query II
+SELECT status, body FROM dash_http('GET', 'http://127.0.0.1:39001/api/dash-dir');
+----
+200	<REGEX>:.*\.duckdb.*extension_data.*dash
+
+# The catch-all GET serves the bundled UI.
+query II
+SELECT status, headers['Content-Type'] FROM dash_http('GET', 'http://127.0.0.1:39001/');
+----
+200	text/html
+
+query III
+SELECT status, body, headers['Content-Type'] FROM dash_http('GET', 'http://127.0.0.1:39001/does-not-exist');
+----
+404	Not found	text/plain
+
+# CORS headers are off unless enable_cors was passed.
+query I
+SELECT headers['Access-Control-Allow-Origin'] IS NULL FROM dash_http('GET', 'http://127.0.0.1:39001/api/ping');
+----
+true
+
+statement error
+CALL start_dash('127.0.0.1', 39001);
+----
+Server already started
+
+statement ok
+CALL stop_dash();
+
+# Stopping twice is a no-op, and nothing listens on the port afterwards.
+statement ok
+CALL stop_dash();
+
+statement error
+SELECT status FROM dash_http('GET', 'http://127.0.0.1:39001/api/ping');
+----
+failed

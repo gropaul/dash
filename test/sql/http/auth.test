@@ -1,0 +1,62 @@
+# name: test/sql/http/auth.test
+# description: the api_key guard on the endpoints that accept one
+# group: [dash]
+
+require dash
+
+require json
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39003, api_key := 'abc123');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39003/api/query',
+                                   headers := MAP {'X-Api-Key': 'abc123'},
+                                   body := '{"query": "SELECT 1 AS i", "format": "json"}');
+----
+200	{"rows":[[1]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":1}}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39003/api/query',
+                                   body := '{"query": "SELECT 1 AS i", "format": "json"}');
+----
+401	{"exception_type":"HTTP","exception_message":"Missing 'X-Api-Key' header"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39003/api/query',
+                                   headers := MAP {'X-Api-Key': '__wrong__'},
+                                   body := '{"query": "SELECT 1 AS i", "format": "json"}');
+----
+401	{"exception_type":"HTTP","exception_message":"Invalid API key"}
+
+# The header name is matched case-insensitively.
+query I
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39003/api/query',
+                             headers := MAP {'x-api-key': 'abc123'},
+                             body := '{"query": "SELECT 1 AS i", "format": "json"}');
+----
+200
+
+# write-file is behind the same guard.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39003/api/write-file',
+                                   body := '{"path": "__TEST_DIR__/unauthorized.txt", "content": "x"}');
+----
+401	{"exception_type":"HTTP","exception_message":"Missing 'X-Api-Key' header"}
+
+# The unauthenticated endpoints stay open.
+query II
+SELECT status, body FROM dash_http('GET', 'http://127.0.0.1:39003/api/ping');
+----
+200	pong
+
+statement error
+CALL start_dash('127.0.0.1', 39003, api_key := '');
+----
+api_key cannot be an empty string
+
+statement ok
+CALL stop_dash();

@@ -17,6 +17,9 @@
 #ifndef EMSCRIPTEN
 #include "include/http_server.hpp"
 #include "include/table_functions.hpp"
+#ifdef DASH_BUILD_TEST_HTTP_CLIENT
+#include "include/http_request_table_function.hpp"
+#endif
 #endif
 #include "query_result_table_function.hpp"
 #include "include/setup.hpp"
@@ -57,6 +60,11 @@ static void LoadInternal(ExtensionLoader &loader) {
 		                 RunOnceGlobalTableFunctionState::Init);
 		loader.RegisterFunction(tf);
 	}
+#ifdef DASH_BUILD_TEST_HTTP_CLIENT
+	{
+		loader.RegisterFunction(GetHttpRequestFunction());
+	}
+#endif
 #endif
 	{
 
@@ -121,6 +129,11 @@ static void LoadInternal(DatabaseInstance &instance) {
 						 RunOnceGlobalTableFunctionState::Init);
 		ExtensionUtil::RegisterFunction(instance, tf);
 	}
+#ifdef DASH_BUILD_TEST_HTTP_CLIENT
+	{
+		ExtensionUtil::RegisterFunction(instance, GetHttpRequestFunction());
+	}
+#endif
 #endif
 {
 

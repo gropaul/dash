@@ -1,0 +1,97 @@
+# name: test/sql/http/query.test
+# description: POST /api/query, the endpoint the UI runs SQL through
+# group: [dash]
+
+require dash
+
+# The server serializes results with to_json.
+require json
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39002);
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELECT 42 AS answer", "format": "json"}');
+----
+200	{"rows":[[42]],"columns":[{"type":"INTEGER","name":"answer"}],"stats":{"rows":1}}
+
+# compact_json is accepted and, today, serialized identically.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELECT 42 AS answer", "format": "compact_json"}');
+----
+200	{"rows":[[42]],"columns":[{"type":"INTEGER","name":"answer"}],"stats":{"rows":1}}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELECT * FROM (VALUES (1, ''a''), (2, ''b'')) t(i, s)", "format": "json"}');
+----
+200	{"rows":[[1,"a"],[2,"b"]],"columns":[{"type":"INTEGER","name":"i"},{"type":"VARCHAR","name":"s"}],"stats":{"rows":2}}
+
+# A statement that returns no rows still returns the envelope.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "CREATE TABLE t (i INTEGER)", "format": "json"}');
+----
+200	{"rows":[],"columns":[],"stats":{"rows":0}}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "INSERT INTO t VALUES (1), (2)", "format": "json"}');
+----
+200	{"rows":[[2]],"columns":[{"type":"BIGINT","name":"Count"}],"stats":{"rows":1}}
+
+# Requests share one connection; test/sql/http/session.test covers what that carries over.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "FROM t ORDER BY i", "format": "json"}');
+----
+200	{"rows":[[1],[2]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":2}}
+
+# Statements before the last one run first, and the last one produces the result.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "CREATE TABLE u AS SELECT 1 AS i; INSERT INTO u VALUES (2); SELECT sum(i) AS total FROM u", "format": "json"}');
+----
+200	{"rows":[[3]],"columns":[{"type":"HUGEINT","name":"total"}],"stats":{"rows":1}}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query', body := 'not json');
+----
+400	{"exception_type":"HTTP","exception_message":"Could not parse JSON body"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query', body := '{"format": "json"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Expected 'query' field as string"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELECT 1"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Expected 'format' field as string"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "", "format": "json"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Query is empty"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELECT 1", "format": "xml"}');
+----
+400	<REGEX>:.*Enum value: 'xml' not implemented.*
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39002/api/query',
+                                   body := '{"query": "SELEKT 1", "format": "json"}');
+----
+400	<REGEX>:.*syntax error at or near.*SELEKT.*
+
+statement ok
+CALL stop_dash();

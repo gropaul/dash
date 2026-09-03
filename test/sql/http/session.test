@@ -1,0 +1,183 @@
+# name: test/sql/http/session.test
+# description: requests share one connection, so catalog and session state carry over between them
+# group: [dash]
+
+require dash
+
+require json
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39009);
+
+# A table created by one request is there for the next one.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE TABLE t (i INTEGER)", "format": "json"}');
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "INSERT INTO t VALUES (1), (2), (3)", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT sum(i) AS total FROM t", "format": "json"}');
+----
+200	{"rows":[[6]],"columns":[{"type":"HUGEINT","name":"total"}],"stats":{"rows":1}}
+
+# The connection running the test sees it too: the server works on the same database instance.
+query I
+SELECT sum(i) FROM t;
+----
+6
+
+# And a table created outside the server is visible over HTTP.
+statement ok
+CREATE TABLE outside AS SELECT 99 AS i;
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "FROM outside", "format": "json"}');
+----
+200	{"rows":[[99]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":1}}
+
+# TEMP objects live on the server connection, so they survive into later requests. They are not
+# visible to the test connection, which has a temp schema of its own.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE TEMP TABLE session_tmp AS SELECT 7 AS i", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "FROM session_tmp", "format": "json"}');
+----
+200	{"rows":[[7]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":1}}
+
+statement error
+FROM session_tmp;
+----
+<REGEX>:.*session_tmp does not exist.*
+
+# A view created over HTTP resolves in a later request.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE VIEW v AS SELECT i * 10 AS i FROM t", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "FROM v ORDER BY i", "format": "json"}');
+----
+200	{"rows":[[10],[20],[30]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":3}}
+
+# A connection-scoped SET stays set for the next request, and does not leak to other connections.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "SET progress_bar_time = 12345", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT current_setting(''progress_bar_time'') AS t", "format": "json"}');
+----
+200	{"rows":[[12345]],"columns":[{"type":"BIGINT","name":"t"}],"stats":{"rows":1}}
+
+query I
+SELECT current_setting('progress_bar_time');
+----
+2000
+
+# So does USE: the next request binds unqualified names in the schema it selected.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE SCHEMA s; USE s", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT current_schema() AS schema", "format": "json"}');
+----
+200	{"rows":[["s"]],"columns":[{"type":"VARCHAR","name":"schema"}],"stats":{"rows":1}}
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE TABLE in_s AS SELECT 1 AS i", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT count(*) AS n FROM s.in_s", "format": "json"}');
+----
+200	{"rows":[[1]],"columns":[{"type":"BIGINT","name":"n"}],"stats":{"rows":1}}
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "USE memory.main", "format": "json"}');
+
+# A database attached by one request stays attached for the next one.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "ATTACH ''__TEST_DIR__/extra.duckdb'' AS extra", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT count(*) AS n FROM duckdb_databases() WHERE database_name = ''extra''", "format": "json"}');
+----
+200	{"rows":[[1]],"columns":[{"type":"BIGINT","name":"n"}],"stats":{"rows":1}}
+
+# ATTACH is instance-wide, so the test connection sees it as well.
+query I
+SELECT count(*) FROM duckdb_databases() WHERE database_name = 'extra';
+----
+1
+
+# USE selects it, and the request after that creates its table in there.
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "USE extra", "format": "json"}');
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "CREATE TABLE in_extra AS SELECT 5 AS i", "format": "json"}');
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                                   body := '{"query": "SELECT current_database() AS db, (SELECT i FROM extra.main.in_extra) AS i", "format": "json"}');
+----
+200	{"rows":[["extra",5]],"columns":[{"type":"VARCHAR","name":"db"},{"type":"INTEGER","name":"i"}],"stats":{"rows":1}}
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39009/api/query',
+                             body := '{"query": "USE memory.main", "format": "json"}');
+
+# Restarting the server hands out a fresh connection: TEMP objects and settings are gone, but
+# the catalog is untouched.
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39010);
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39010/api/query',
+                                   body := '{"query": "SELECT sum(i) AS total FROM t", "format": "json"}');
+----
+200	{"rows":[[6]],"columns":[{"type":"HUGEINT","name":"total"}],"stats":{"rows":1}}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39010/api/query',
+                                   body := '{"query": "SELECT current_setting(''progress_bar_time'') AS t, current_schema() AS schema, current_database() AS db", "format": "json"}');
+----
+200	{"rows":[[2000,"main","memory"]],"columns":[{"type":"BIGINT","name":"t"},{"type":"VARCHAR","name":"schema"},{"type":"VARCHAR","name":"db"}],"stats":{"rows":1}}
+
+# The attachment is on the instance, not on the connection, so it outlives the restart.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39010/api/query',
+                                   body := '{"query": "SELECT i FROM extra.main.in_extra", "format": "json"}');
+----
+200	{"rows":[[5]],"columns":[{"type":"INTEGER","name":"i"}],"stats":{"rows":1}}
+
+statement ok
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39010/api/query',
+                             body := '{"query": "DETACH extra", "format": "json"}');
+
+statement ok
+CALL stop_dash();

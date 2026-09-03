@@ -57,8 +57,8 @@ Once the _dash_ is running, access the WebUI by opening http://127.0.0.1:4200 in
 | `/ping`  | GET    | Check if the server is running. |                                                                                                                                                                                                                                          |
 
 For detailed schema definitions refer to the [API documentation](openapi.yaml).
-This also contains instructions on querying and uploading files using the HTTP API. For a reference client
-implementation have a look at the [Python test client](./e2e_tests/client.py).
+This also contains instructions on querying and uploading files using the HTTP API. For worked examples of
+every endpoint, including file uploads, see the tests in [`test/sql/http/`](./test/sql/http).
 
 ## Serialization pragmas
 
@@ -147,14 +147,12 @@ CLion. The actual DuckDB CLI currently does not reliably work as a run target in
 
 ### Testing
 
-To run the E2E test install all packages necessary:
+Run the test suite:
 
 ```bash
-pip install -r requirements.txt
+make test_debug
 ```
 
-Then run the test suite:
-
-```bash
-pytest e2e_tests
-```
+The tests are [SQLLogicTests](https://duckdb.org/dev/sqllogictest/intro.html). The ones in
+`test/sql/http/` start the server and send it real HTTP requests; see
+[`test/README.md`](./test/README.md).

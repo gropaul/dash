@@ -1,0 +1,21 @@
+# name: test/sql/http/cancel.test
+# description: POST /api/cancel interrupts every connection on the instance
+# group: [dash]
+
+require dash
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39008);
+
+# The connection issuing the request is one of the connections that get interrupted, so the
+# cancel comes back to the caller as an interrupt rather than as a response body.
+statement error
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39008/api/cancel');
+----
+Interrupted
+
+statement ok
+CALL stop_dash();

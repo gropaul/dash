@@ -106,12 +106,20 @@ public:
 
 		const auto host = data.host;
 		const auto port = data.port;
-		server_thread = std::thread([host, port, this] {
-			if (!server.listen(host, port)) {
-				Printer::Print("Failed to start HTTP server on " + host + ":" + std::to_string(port));
-				Stop(false);
-			}
-		});
+		listen_failed = false;
+		server_thread = std::thread([host, port, this] { listen_failed = !server.listen(host, port); });
+
+		// Return only once the socket accepts connections, so a caller that fires a request straight
+		// after start_dash does not race the listen thread.
+		while (!server.is_running() && !listen_failed) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		if (listen_failed) {
+			server_thread.join();
+			db_instance.reset();
+			started = false;
+			throw IOException("Failed to start HTTP server on " + host + ":" + std::to_string(port));
+		}
 	}
 
 	void Stop(const bool join_thread = true) {
@@ -278,6 +286,7 @@ private:
 	}
 
 	std::atomic_bool started {false};
+	std::atomic_bool listen_failed {false};
 	Server server;
 
 	string api_key {};

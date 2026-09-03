@@ -37,6 +37,13 @@ set(EXTENSION_SOURCES
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
+# dash_http is the HTTP client test/sql/http/*.test drives the server with. It goes into the
+# static extension, which the test binary links, and never into the loadable extension that ships.
+option(DASH_BUILD_TEST_HTTP_CLIENT "Register the dash_http table function in the static extension" ON)
+if(DASH_BUILD_TEST_HTTP_CLIENT)
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE DASH_BUILD_TEST_HTTP_CLIENT)
+endif()
+
 # 4) Link OpenSSL
 target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)

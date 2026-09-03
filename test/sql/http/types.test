@@ -1,0 +1,49 @@
+# name: test/sql/http/types.test
+# description: how DuckDB types come back out of /api/query
+# group: [dash]
+
+require dash
+
+require json
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39011);
+
+# Nested, unsigned, binary and NULL values all survive the trip.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39011/api/query',
+                                   body := '{"query": "SELECT 170141183460469231731687303715884105727::HUGEINT AS h, ''🦆🦆''::VARCHAR AS duck, ''\\x00\\x01''::BLOB AS b, INTERVAL 1 MONTH AS iv, [1, NULL, 3] AS l, {''a'': 1, ''b'': [2]} AS st, MAP {''k'': 1} AS m, ''2024-01-02 03:04:05''::TIMESTAMP AS ts, NULL::INTEGER AS n", "format": "json"}');
+----
+200	{"rows":[[170141183460469231731687303715884105727,"🦆🦆","\\x00\\x01","1 month",[1,null,3],{"a":1,"b":[2]},{"k":1},"2024-01-02 03:04:05",null]],"columns":[{"type":"HUGEINT","name":"h"},{"type":"VARCHAR","name":"duck"},{"type":"BLOB","name":"b"},{"type":"INTERVAL","name":"iv"},{"type":"INTEGER[]","name":"l"},{"type":"STRUCT(a INTEGER, b INTEGER[])","name":"st"},{"type":"MAP(VARCHAR, INTEGER)","name":"m"},{"type":"TIMESTAMP","name":"ts"},{"type":"INTEGER","name":"n"}],"stats":{"rows":1}}
+
+# Every type DuckDB has: the envelope reports one column per column, and the names and types it
+# reports are the ones DESCRIBE gives for the same query.
+statement ok
+CREATE TABLE all_types_response AS
+SELECT body FROM dash_http('POST', 'http://127.0.0.1:39011/api/query',
+                           body := '{"query": "FROM test_all_types()", "format": "json"}');
+
+query III
+SELECT json_array_length(body -> '$.rows'),
+       json_array_length(body -> '$.columns') = (SELECT count(*) FROM (DESCRIBE FROM test_all_types())),
+       body -> '$.stats'
+FROM all_types_response;
+----
+3	true	{"rows":3}
+
+query II
+WITH served AS (
+    SELECT list(json_extract_string(c, '$.name')) AS names, list(json_extract_string(c, '$.type')) AS types
+    FROM (SELECT unnest(json_extract(body, '$.columns[*]')) AS c FROM all_types_response)
+), described AS (
+    SELECT list(column_name) AS names, list(column_type) AS types FROM (DESCRIBE FROM test_all_types())
+)
+SELECT served.names = described.names, served.types = described.types FROM served, described;
+----
+true	true
+
+statement ok
+CALL stop_dash();

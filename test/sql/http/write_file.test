@@ -1,0 +1,86 @@
+# name: test/sql/http/write_file.test
+# description: POST /api/write-file
+# group: [dash]
+
+require dash
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39006);
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "hello world"}');
+----
+200	<REGEX>:\{"path":".*written\.txt","bytes_written":11,"overwritten":false\}
+
+# The file is really on disk, with the content that was sent.
+query I
+SELECT content FROM read_text('__TEST_DIR__/written.txt');
+----
+hello world
+
+# Writing again over an existing file is refused unless it is asked for.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "x"}');
+----
+409	<REGEX>:.*File already exists.*allow_override.*
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "__TEST_DIR__/written.txt", "content": "x", "allow_override": true}');
+----
+200	<REGEX>:\{"path":".*written\.txt","bytes_written":1,"overwritten":true\}
+
+# The overwrite truncates: nothing of the longer previous content is left.
+query I
+SELECT content FROM read_text('__TEST_DIR__/written.txt');
+----
+x
+
+# Missing parent directories are created.
+query I
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                             body := '{"path": "__TEST_DIR__/nested/deeper/file.txt", "content": "here"}');
+----
+200
+
+query I
+SELECT content FROM read_text('__TEST_DIR__/nested/deeper/file.txt');
+----
+here
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file', body := 'not json');
+----
+400	{"exception_type":"HTTP","exception_message":"Could not parse JSON body"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"content": "x"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Expected 'path' field as string"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "__TEST_DIR__/x.txt"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Expected 'content' field as string"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "", "content": "x"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Path is empty"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39006/api/write-file',
+                                   body := '{"path": "__TEST_DIR__", "content": "x"}');
+----
+400	<REGEX>:.*Path is an existing directory.*
+
+statement ok
+CALL stop_dash();
