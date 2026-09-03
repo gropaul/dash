@@ -2,6 +2,7 @@
 
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/connection_manager.hpp"
+#include "duckdb/main/connection.hpp"
 #include "execution_request.hpp"
 #include "files.hpp"
 #include "http_error_data.hpp"
@@ -15,6 +16,7 @@
 #include "httplib.hpp"
 
 #include <duckdb/common/types/blob.hpp>
+#include <mutex>
 
 namespace duckdb {
 using namespace duckdb_httplib_openssl; // NOLINT(*-build-using-namespace)
@@ -99,6 +101,9 @@ public:
 		Printer::Print("Starting server on " + user_click_url);
 
 		db_instance = c.db;
+		// One connection for the life of the server, so USE, SET and TEMP objects persist
+		// across requests instead of dying with the connection that created them.
+		session_connection = make_uniq<Connection>(*c.db);
 
 		api_key = data.api_key;
 		enable_cors = data.enable_cors;
@@ -116,6 +121,7 @@ public:
 		}
 		if (listen_failed) {
 			server_thread.join();
+			session_connection.reset();
 			db_instance.reset();
 			started = false;
 			throw IOException("Failed to start HTTP server on " + host + ":" + std::to_string(port));
@@ -129,6 +135,10 @@ public:
 
 		Printer::Print("Stopping server");
 		server.stop();
+		{
+			std::lock_guard<std::mutex> guard(session_mutex);
+			session_connection.reset();
+		}
 		db_instance.reset();
 		if (join_thread) {
 			server_thread.join();
@@ -138,11 +148,18 @@ public:
 	}
 
 private:
-	void ExecuteQuery(const Request &req, Response &res) const {
+	void ExecuteQuery(const Request &req, Response &res) {
 		AddCorsHeaders(res);
 		auto execution_request = ExecutionRequest::FromRequest(req, api_key);
 		RETURN_IF_ERROR_CB(execution_request, ([&res](const HttpErrorData &error) { RespondError(error, res); }))
-		auto execution_error = execution_request->Execute(db_instance.lock(), res);
+
+		// Requests share one ClientContext, which runs a single query at a time.
+		std::lock_guard<std::mutex> guard(session_mutex);
+		if (!session_connection) {
+			RespondError(HttpErrorData {InternalServerError_500, "Database not available"}, res);
+			return;
+		}
+		auto execution_error = execution_request->Execute(*session_connection, res);
 		RETURN_IF_ERROR_CB(execution_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
 	}
 
@@ -295,6 +312,8 @@ private:
 
 	std::thread server_thread;
 	weak_ptr<DatabaseInstance> db_instance;
+	unique_ptr<Connection> session_connection;
+	std::mutex session_mutex;
 };
 
 DashHttpServer server;

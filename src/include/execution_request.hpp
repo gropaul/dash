@@ -3,6 +3,7 @@
 #include "auto_cleaner.hpp"
 #include "duckdb/main/client_data.hpp"
 #include "duckdb/main/connection.hpp"
+#include "duckdb/main/relation/materialized_relation.hpp"
 #include "response_format.hpp"
 #include "result.hpp"
 #include "temp_file.hpp"
@@ -36,11 +37,9 @@ struct ExecutionRequest {
 	    : query(query), format(format), files(files) {
 	}
 
-	Result<std::nullptr_t> Execute(const shared_ptr<DatabaseInstance> &db, Response &res) const {
-		D_ASSERT(db);
+	Result<std::nullptr_t> Execute(Connection &conn, Response &res) const {
 		D_ASSERT(format != ResponseFormat::INVALID);
 
-		Connection conn(*db);
 		std::vector<unique_ptr<TempFile>> temp_files;
 		// Create a temporary table for each file by creating the files in the temporary directory, then creating a
 		// temporary table for each file
@@ -54,18 +53,67 @@ struct ExecutionRequest {
 		}
 
 		for (const auto &file : temp_files) {
-			auto create_file_query = "CREATE TEMP TABLE " + KeywordHelper::WriteQuoted(file->GetName()) + " AS FROM " +
-			                         KeywordHelper::WriteQuoted(file->GetPath());
+			// OR REPLACE because the session connection outlives the request that created the table.
+			auto create_file_query = "CREATE OR REPLACE TEMP TABLE " + KeywordHelper::WriteQuoted(file->GetName()) +
+			                         " AS FROM " + KeywordHelper::WriteQuoted(file->GetPath());
 			auto result = conn.Query(create_file_query);
 			if (result->HasError()) {
 				return {InternalServerError_500, result->GetErrorObject()};
 			}
 		}
-		const string escaped_query = EscapeQutes(query);
 
+		vector<unique_ptr<SQLStatement>> statements;
+		try {
+			statements = conn.ExtractStatements(query);
+		} catch (const std::exception &ex) {
+			return {BadRequest_400, ErrorData(ex)};
+		}
+		if (statements.empty()) {
+			return HttpErrorData {BadRequest_400, "No statements found in query"};
+		}
+
+		// Everything before the final statement runs directly on the session connection, so USE, SET
+		// and TEMP DDL take effect on the connection that binds the final statement and survive into
+		// later requests.
+		for (idx_t i = 0; i + 1 < statements.size(); i++) {
+			auto result = conn.Query(std::move(statements[i]));
+			if (result->HasError()) {
+				return {BadRequest_400, result->GetErrorObject()};
+			}
+		}
+
+		if (statements.back()->type == StatementType::SELECT_STATEMENT) {
+			// query_result's bind_replace turns this into a SubqueryRef bound on `conn`, which keeps
+			// return types coming from the parse tree and leaves the subquery open to the optimizer.
+			return RespondWithJson(conn, "query_result('" + EscapeQutes(statements.back()->query) + "')", res);
+		}
+
+		// Anything else has to run on the session connection itself, so its effect on the catalog and
+		// on session state is the one later requests see.
+		auto result = conn.Query(std::move(statements.back()));
+		if (result->HasError()) {
+			return {BadRequest_400, result->GetErrorObject()};
+		}
+		return RespondWithResult(conn, std::move(result), res);
+	}
+
+	static Result<ExecutionRequest> FromRequest(const Request &req, const std::string &api_key) {
+		RETURN_IF_ERROR(HasCorrectApiKey(api_key, req));
+
+		auto body = GetRequestBody(req);
+		RETURN_IF_ERROR(body);
+
+		return ParseQuery(body->first, body->second);
+	}
+
+private:
+
+	// Serialization stays in SQL: to_json handles arbitrarily nested DuckDB types, which is not
+	// something worth reimplementing in C++. `data_source` is any table expression.
+	static string JsonQuery(const string &data_source) {
 		const std::string query_template = R"(
 		    WITH data AS (
-		        FROM query_result('{}')
+		        FROM {}
 		    ),
 			dash_row_number_ids AS (
 			        SELECT range as dash_row_number_id
@@ -95,29 +143,46 @@ struct ExecutionRequest {
 			FROM combined_data
 
 		)";
-		const string json_query = duckdb_fmt::format(query_template, escaped_query);
+		return duckdb_fmt::format(query_template, data_source);
+	}
 
-		auto result = conn.Query(json_query);
+	static Result<std::nullptr_t> RespondWithJson(Connection &conn, const string &data_source, Response &res) {
+		auto result = conn.Query(JsonQuery(data_source));
 		if (result->HasError()) {
 			return {BadRequest_400, result->GetErrorObject()};
 		}
-
-		const auto json = result->GetValue(0,0);
-		res.set_content(json.ToString(), "application/json");
-
+		res.set_content(result->GetValue(0, 0).ToString(), "application/json");
 		return nullptr;
 	}
 
-	static Result<ExecutionRequest> FromRequest(const Request &req, const std::string &api_key) {
-		RETURN_IF_ERROR(HasCorrectApiKey(api_key, req));
+	// A statement that already ran cannot be re-run inside the JSON wrapper, so its result is bound
+	// back into SQL as an in-memory relation and serialized by the same template.
+	static Result<std::nullptr_t> RespondWithResult(Connection &conn, unique_ptr<MaterializedQueryResult> result,
+	                                                Response &res) {
+		// CreateView takes a bare identifier; everything referencing it qualifies the temp schema so
+		// a user's USE cannot move the lookup elsewhere.
+		static constexpr const char *RESULT_VIEW = "__dash_last_result";
+		static constexpr const char *RESULT_VIEW_REF = "temp.main.__dash_last_result";
 
-		auto body = GetRequestBody(req);
-		RETURN_IF_ERROR(body);
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
+		auto names = result->GetNames();
+#else
+		auto names = result->names;
+#endif
+		auto relation = make_shared_ptr<MaterializedRelation>(conn.context, result->TakeCollection(), names);
+		auto json_result = relation->Query(RESULT_VIEW, JsonQuery(RESULT_VIEW_REF));
+		auto json_error = json_result->HasError() ? json_result->GetErrorObject() : ErrorData();
 
-		return ParseQuery(body->first, body->second);
+		// Release the collection the view pins; it is only needed for the query above.
+		conn.Query(string("DROP VIEW IF EXISTS ") + RESULT_VIEW_REF);
+
+		if (json_error.HasError()) {
+			return {BadRequest_400, json_error};
+		}
+		auto materialized = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(json_result));
+		res.set_content(materialized->GetValue(0, 0).ToString(), "application/json");
+		return nullptr;
 	}
-
-private:
 
 	static Result<std::pair<std::string, const MultipartFiles &>> GetRequestBody(const Request &req) {
 #if HTTPLIB_NEW_MULTIPART_API
