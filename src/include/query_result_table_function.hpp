@@ -212,6 +212,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	const string query = input.inputs[0].GetValue<string>();
 
 	Connection conn(*context.db);
+	CopySessionState(context, *conn.context);
 
 	// Execute all statements on this connection. For multi-statement queries,
 	// bind_replace returned nullptr so nothing has been executed yet.
@@ -226,6 +227,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 
 	// Execute the last statement
 	auto result = ExecuteInterruptibly(conn, context, std::move(statements.back()));
+	CopySessionState(*conn.context, context);
 
 #if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
 	const auto &result_types = result->GetTypes();
