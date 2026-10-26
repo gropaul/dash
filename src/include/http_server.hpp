@@ -4,6 +4,7 @@
 #include "duckdb/main/connection_manager.hpp"
 #include "duckdb/main/connection.hpp"
 #include "execution_request.hpp"
+#include "file_operation_request.hpp"
 #include "files.hpp"
 #include "http_error_data.hpp"
 #include "large_stack_thread_pool.hpp"
@@ -58,6 +59,13 @@ public:
 		server.Post("/api/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Post("/api/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
 		server.Post("/api/write-file", [this](const Request &req, Response &res) { WriteFile(req, res); });
+		server.Post("/api/move-file",
+		            [this](const Request &req, Response &res) { RunFileOperation(FileOperation::MOVE, req, res); });
+		server.Post("/api/remove-file",
+		            [this](const Request &req, Response &res) { RunFileOperation(FileOperation::REMOVE, req, res); });
+		server.Post("/api/make-directory", [this](const Request &req, Response &res) {
+			RunFileOperation(FileOperation::MAKE_DIRECTORY, req, res);
+		});
 		server.Get("/api/ping", [](const Request &, Response &res) { res.body = "pong"; });
 		server.Get("/api/dash-dir", [this](const Request &req, Response &res) { ServeDashDirectory(req, res); });
 		server.Get(".*", [this](const Request &req, Response &res) { ServeUi(req, res); });
@@ -179,6 +187,22 @@ private:
 
 		auto write_error = write_file_request->Execute(db, res);
 		RETURN_IF_ERROR_CB(write_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+	}
+
+	void RunFileOperation(const FileOperation operation, const Request &req, Response &res) const {
+		AddCorsHeaders(res);
+
+		auto request = FileOperationRequest::FromRequest(operation, req, api_key);
+		RETURN_IF_ERROR_CB(request, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
+
+		auto db = db_instance.lock();
+		if (!db) {
+			RespondError(HttpErrorData {InternalServerError_500, "Database not available"}, res);
+			return;
+		}
+
+		auto operation_error = request->Execute(db, res);
+		RETURN_IF_ERROR_CB(operation_error, ([&res](const HttpErrorData &error) { RespondError(error, res); }));
 	}
 
 	void CancelAllQueries(const Request &req, Response &res) const {
