@@ -18,7 +18,10 @@ jobs:
     name: Build extension binaries (main)
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
     with:
-      duckdb_version: main
+      # DuckDB's CMake parses DUCKDB_VERSION as a version, so the branch goes in duckdb_commit.
+      # Bump to main's scripts/ci/release_version.txt when it moves on.
+      duckdb_commit: main
+      duckdb_version: v2.1.0-dev0
       ci_tools_version: main
       extension_name: dash
 
