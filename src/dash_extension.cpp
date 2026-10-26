@@ -49,10 +49,10 @@ static void LoadInternal(ExtensionLoader &loader) {
 		                     LogicalType::INTEGER  // Port
 		                 },
 		                 StartHttpServer, BindStartHttpServer, RunOnceGlobalTableFunctionState::Init);
-		tf.named_parameters["api_key"] = LogicalType::VARCHAR;
-		tf.named_parameters["enable_cors"] = LogicalType::BOOLEAN;
-		tf.named_parameters["ui_proxy"] = LogicalType::VARCHAR;
-		tf.named_parameters["open_browser"] = LogicalType::BOOLEAN;
+		AddNamedParameter(tf, "api_key", LogicalType::VARCHAR);
+		AddNamedParameter(tf, "enable_cors", LogicalType::BOOLEAN);
+		AddNamedParameter(tf, "ui_proxy", LogicalType::VARCHAR);
+		AddNamedParameter(tf, "open_browser", LogicalType::BOOLEAN);
 		loader.RegisterFunction(tf);
 	}{
 
@@ -80,7 +80,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 		loader.RegisterFunction(dash_home);
 	}
 
-	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
+	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultGlobalState::Init);
 	query_result.bind_replace = QueryResultBindReplace;
 	loader.RegisterFunction(query_result);
 	conn.Commit();
@@ -150,7 +150,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 	ExtensionUtil::RegisterFunction(instance, dash_home);
 }
 
-	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultState::Init);
+	TableFunction query_result("query_result", {LogicalType::VARCHAR}, QueryResultFun, QueryResultBind, QueryResultGlobalState::Init);
 	query_result.bind_replace = QueryResultBindReplace;
 	ExtensionUtil::RegisterFunction(instance, query_result);
 	conn.Commit();

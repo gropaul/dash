@@ -14,18 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  duckdb-main-commit:
+    name: Resolve DuckDB main
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - id: resolve
+        run: echo "sha=$(git ls-remote https://github.com/duckdb/duckdb refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+
   duckdb-next-build:
     name: Build extension binaries (main)
+    needs: duckdb-main-commit
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
     with:
-      duckdb_version: main
+      # DuckDB's CMake reads these as its commit hash and version, so neither can be a branch name.
+      # Bump the version to main's scripts/ci/release_version.txt when it moves on.
+      duckdb_commit: ${{ needs.duckdb-main-commit.outputs.sha }}
+      duckdb_version: v2.1.0-dev0
       ci_tools_version: main
       extension_name: dash
 
   duckdb-stable-build:
     name: Build extension binaries (stable)
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.5
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v2.0-cyanoptera
     with:
-      duckdb_version: v1.5.5
-      ci_tools_version: v1.5.5
+      duckdb_version: v2.0.0
+      ci_tools_version: v2.0-cyanoptera
       extension_name: dash

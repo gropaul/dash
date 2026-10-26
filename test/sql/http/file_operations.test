@@ -1,0 +1,92 @@
+# name: test/sql/http/file_operations.test
+# description: POST /api/move-file, /api/remove-file and /api/make-directory
+# group: [dash]
+
+require dash
+
+statement ok
+CALL stop_dash();
+
+statement ok
+CALL start_dash('127.0.0.1', 39007);
+
+query I
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39007/api/write-file',
+                             body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/ops/a.md", "content": "alpha"}');
+----
+200
+
+# A move creates the target's parent directories.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/move-file',
+                                   body := '{"from": "' || replace('__TEST_DIR__', '\', '/') || '/ops/a.md", "to": "' || replace('__TEST_DIR__', '\', '/') || '/ops/sub/b.md"}');
+----
+200	<REGEX>:\{"path":".*a\.md","changed":true\}
+
+query I
+SELECT content FROM read_text('__TEST_DIR__/ops/sub/b.md');
+----
+alpha
+
+# A directory moves with its contents.
+query I
+SELECT status FROM dash_http('POST', 'http://127.0.0.1:39007/api/move-file',
+                             body := '{"from": "' || replace('__TEST_DIR__', '\', '/') || '/ops/sub", "to": "' || replace('__TEST_DIR__', '\', '/') || '/ops/moved"}');
+----
+200
+
+query I
+SELECT content FROM read_text('__TEST_DIR__/ops/moved/b.md');
+----
+alpha
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/move-file',
+                                   body := '{"from": "' || replace('__TEST_DIR__', '\', '/') || '/ops/missing.md", "to": "' || replace('__TEST_DIR__', '\', '/') || '/ops/x.md"}');
+----
+404	<REGEX>:.*No such file or directory.*
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/move-file',
+                                   body := '{"from": "x"}');
+----
+400	{"exception_type":"HTTP","exception_message":"Expected 'to' field as string"}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/make-directory',
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/ops/empty/deeper"}');
+----
+200	<REGEX>:\{"path":".*deeper","changed":true\}
+
+query I
+SELECT body FROM dash_http('POST', 'http://127.0.0.1:39007/api/make-directory',
+                           body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/ops/empty/deeper"}');
+----
+<REGEX>:.*"changed":false\}
+
+# A directory is removed with its contents; a missing path is no error.
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/remove-file',
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/ops/moved"}');
+----
+200	<REGEX>:.*"changed":true\}
+
+query I
+SELECT count(*) FROM glob('__TEST_DIR__/ops/moved/*');
+----
+0
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/remove-file',
+                                   body := '{"path": "' || replace('__TEST_DIR__', '\', '/') || '/ops/moved"}');
+----
+200	<REGEX>:.*"changed":false\}
+
+query II
+SELECT status, body FROM dash_http('POST', 'http://127.0.0.1:39007/api/remove-file',
+                                   body := '{"path": ""}');
+----
+400	{"exception_type":"HTTP","exception_message":"'path' is empty"}
+
+statement ok
+CALL stop_dash();

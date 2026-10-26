@@ -1,0 +1,260 @@
+# name: test/sql/query_result_session.test
+# description: query_result resolves names like the calling session, and USE inside it keeps the last SELECT optimizable
+# group: [sql]
+
+require dash
+
+statement ok
+ATTACH '__TEST_DIR__/qr_session.duckdb' AS qr_extra;
+
+statement ok
+CREATE TABLE qr_extra.main.t AS SELECT range::INTEGER AS i FROM range(100);
+
+statement ok
+CREATE SCHEMA qr_extra.s2;
+
+statement ok
+CREATE TABLE qr_extra.s2.t2 AS SELECT 42 AS k;
+
+# A decoy with the same name in the default database: resolving there returns -1
+statement ok
+CREATE TABLE memory.main.t AS SELECT -1 AS i;
+
+# Several read-only statements, the last one produces the result
+query I
+FROM query_result('SELECT 1; SELECT 2');
+----
+2
+
+query I
+FROM query_result('SELECT 1; EXPLAIN SELECT 1; SELECT 3');
+----
+3
+
+# A USE in the session applies to a single SELECT
+statement ok
+USE qr_extra;
+
+query I
+SELECT count(*) FROM query_result('SELECT * FROM t');
+----
+100
+
+statement ok
+USE memory.main;
+
+# A USE inside query_result applies to the last SELECT
+query I
+SELECT count(*) FROM query_result('USE qr_extra; SELECT * FROM t');
+----
+100
+
+# and carries over into the session, as if it had run there
+query I
+SELECT current_database();
+----
+qr_extra
+
+statement ok
+USE memory.main;
+
+query I
+SELECT count(*) FROM query_result('USE qr_extra.s2; SELECT * FROM t2');
+----
+1
+
+query II
+SELECT current_database(), current_schema();
+----
+qr_extra	s2
+
+statement ok
+USE memory.main;
+
+query I
+FROM query_result('USE qr_extra; SET schema = ''s2''; SELECT k FROM t2');
+----
+42
+
+statement ok
+USE memory.main;
+
+query II
+FROM query_result('SET search_path = ''qr_extra.s2,qr_extra.main''; SELECT k, (SELECT count(*) FROM t) FROM t2');
+----
+42	100
+
+statement ok
+USE memory.main;
+
+query I
+FROM query_result('USE qr_extra; RESET schema; SELECT i FROM t');
+----
+-1
+
+query I
+SELECT current_database();
+----
+memory
+
+# The last SELECT stays a subquery, so filters and limits reach the scan
+query II
+EXPLAIN SELECT * FROM query_result('USE qr_extra; SELECT * FROM t') WHERE i = 7 LIMIT 3;
+----
+physical_plan	<REGEX>:.*Seq Scan.*Table: qr_extra.main.t.*Filters: i = 7.*
+
+query II
+EXPLAIN SELECT * FROM query_result('USE qr_extra; SELECT * FROM t') WHERE i = 7 LIMIT 3;
+----
+physical_plan	<!REGEX>:.*QUERY_RESULT.*
+
+statement ok
+USE memory.main;
+
+query I
+SELECT i FROM query_result('USE qr_extra; SELECT * FROM t') WHERE i > 95 ORDER BY i;
+----
+96
+97
+98
+99
+
+statement ok
+USE memory.main;
+
+# A USE that fails reports the catalog error and leaves the session where it was
+statement error
+FROM query_result('USE qr_no_such_db; SELECT 1');
+----
+<REGEX>:^Catalog Error:.*qr_no_such_db.*
+
+query I
+SELECT current_database();
+----
+memory
+
+# Other SET statements reach the last SELECT and the session the same way
+query I
+FROM query_result('SET VARIABLE qr_v = 5; SELECT getvariable(''qr_v'')');
+----
+5
+
+query I
+SELECT getvariable('qr_v');
+----
+5
+
+query I
+FROM query_result('SET default_order = ''DESC''; SELECT i FROM range(3) r(i) ORDER BY i');
+----
+2
+1
+0
+
+query I
+SELECT current_setting('default_order');
+----
+DESC
+
+statement ok
+RESET default_order;
+
+query II
+EXPLAIN SELECT * FROM query_result('SET VARIABLE qr_v = 6; USE qr_extra; SELECT * FROM t') WHERE i = 7;
+----
+physical_plan	<REGEX>:.*Seq Scan.*Filters: i = 7.*
+
+statement ok
+USE memory.main;
+
+# The session's settings and variables are visible to the statements query_result runs itself
+statement ok
+SET VARIABLE qr_caller = 9;
+
+statement ok
+SET default_order = 'DESC';
+
+query I
+FROM query_result('SELECT 1; SELECT getvariable(''qr_caller'')');
+----
+9
+
+query I
+FROM query_result('CREATE TABLE qr_vt AS SELECT getvariable(''qr_caller'') AS v; SELECT v FROM qr_vt');
+----
+9
+
+query I
+FROM query_result('CREATE TABLE qr_ot AS SELECT range AS i FROM range(3); SELECT i FROM qr_ot ORDER BY i');
+----
+2
+1
+0
+
+statement ok
+RESET default_order;
+
+statement ok
+DROP TABLE qr_vt;
+
+statement ok
+DROP TABLE qr_ot;
+
+# Statements that change data run the whole query on one new connection, which starts from the
+# session's USE ...
+statement ok
+USE qr_extra;
+
+query I
+FROM query_result('CREATE TABLE IF NOT EXISTS u (j INTEGER); INSERT INTO u VALUES (1), (2); SELECT count(*) FROM t');
+----
+100
+
+query I
+SELECT count(*) FROM qr_extra.main.u;
+----
+2
+
+query I
+FROM query_result('INSERT INTO u VALUES (3)');
+----
+1
+
+query I
+SELECT count(*) FROM qr_extra.main.u;
+----
+3
+
+statement ok
+USE memory.main;
+
+# ... and hands a USE among its statements back to the session
+query I
+FROM query_result('USE qr_extra.s2; CREATE TABLE v AS SELECT 7 AS x; SELECT x FROM v');
+----
+7
+
+query II
+SELECT current_database(), current_schema();
+----
+qr_extra	s2
+
+query I
+SELECT x FROM qr_extra.s2.v;
+----
+7
+
+statement ok
+USE memory.main;
+
+# The plan of this path executes everything up front, nothing reaches inside
+query II
+EXPLAIN SELECT * FROM query_result('CREATE TABLE IF NOT EXISTS qr_extra.main.w (j INTEGER); SELECT * FROM qr_extra.main.t') WHERE i = 7;
+----
+physical_plan	<REGEX>:.*QUERY_RESULT.*
+
+statement ok
+DETACH qr_extra;
+
+statement ok
+DROP TABLE memory.main.t;
