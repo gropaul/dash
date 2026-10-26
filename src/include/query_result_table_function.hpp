@@ -51,8 +51,16 @@ static bool PrecedingStatementsAreReadOnly(ClientContext &context, const vector<
 }
 
 
-static unique_ptr<SubqueryRef> ParseSubquery(const string &query, const ParserOptions &options, const string &err_msg) {
-	Parser parser(options);
+static Parser MakeParser(ClientContext &context) {
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
+	return Parser(context);
+#else
+	return Parser(context.GetParserOptions());
+#endif
+}
+
+static unique_ptr<SubqueryRef> ParseSubquery(const string &query, ClientContext &context, const string &err_msg) {
+	auto parser = MakeParser(context);
 	parser.ParseQuery(query);
 	if (parser.statements.size() != 1) {
 		throw ParserException(err_msg);
@@ -74,24 +82,47 @@ static unique_ptr<SubqueryRef> ParseSubquery(const string &query, const ParserOp
 	}
 }
 
+// Run `statement` to completion on `conn`, interrupting it when `context` is interrupted.
+static unique_ptr<materialized_result_t> ExecuteInterruptibly(Connection &conn, ClientContext &context,
+                                                             unique_ptr<SQLStatement> statement) {
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
+	auto result = conn.Submit(std::move(statement));
+	result->Materialize();
+	QueryResultState status;
+	do {
+		status = result->ExecuteTask();
+		if (ClientContextIsInterrupted(context)) {
+			conn.Interrupt();
+			throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
+		}
+	} while (!IsTerminal(status));
+	if (result->HasError()) {
+		throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
+	}
+	return result;
+#else
+	auto pending = conn.PendingQuery(std::move(statement));
+	PendingExecutionResult status;
+	do {
+		status = pending->ExecuteTask();
+		if (ClientContextIsInterrupted(context)) {
+			conn.Interrupt();
+			throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
+		}
+	} while (!PendingQueryResult::IsResultReady(status) && status != PendingExecutionResult::EXECUTION_ERROR);
+	auto query_result = pending->Execute();
+	if (query_result->HasError()) {
+		throw Exception(query_result->GetErrorObject().Type(), query_result->GetErrorObject().RawMessage());
+	}
+	return unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(query_result));
+#endif
+}
+
 // Execute all but the last statement in `statements` on `conn`, with interrupt checking.
 static void ExecutePrecedingStatements(Connection &conn, ClientContext &context,
                                        const vector<unique_ptr<SQLStatement>> &statements) {
 	for (idx_t i = 0; i < statements.size() - 1; i++) {
-		auto pending = conn.PendingQuery(statements[i]->query);
-		PendingExecutionResult status;
-		do {
-			status = pending->ExecuteTask();
-			if (ClientContextIsInterrupted(context)) {
-				conn.Interrupt();
-				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
-			}
-		} while (!PendingQueryResult::IsResultReady(status) &&
-		         status != PendingExecutionResult::EXECUTION_ERROR);
-		auto result = pending->Execute();
-		if (result->HasError()) {
-			throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
-		}
+		ExecuteInterruptibly(conn, context, statements[i]->Copy());
 	}
 }
 
@@ -113,7 +144,7 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 
 	const string query = input.inputs[0].GetValue<string>();
 
-	Parser parser(context.GetParserOptions());
+	auto parser = MakeParser(context);
 	parser.ParseQuery(query);
 
 	if (parser.statements.empty()) {
@@ -128,7 +159,7 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 			Connection conn(*context.db);
 			ExecutePrecedingStatements(conn, context, parser.statements);
 		}
-		auto subquery_ref = ParseSubquery(query, context.GetParserOptions(), "Expected a single SELECT statement");
+		auto subquery_ref = ParseSubquery(query, context, "Expected a single SELECT statement");
 		return std::move(subquery_ref);
 	}
 
@@ -139,9 +170,9 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 // Fallback bind + function for non-SELECT last statements.
 struct QueryResultFunctionData final : FunctionData {
 
-	unique_ptr<MaterializedQueryResult> result;
+	unique_ptr<materialized_result_t> result;
 	string query;
-	explicit QueryResultFunctionData(const string &query_p, unique_ptr<MaterializedQueryResult> result_p)
+	explicit QueryResultFunctionData(const string &query_p, unique_ptr<materialized_result_t> result_p)
 	    : result(std::move(result_p)), query(query_p) {
 	}
 
@@ -155,15 +186,15 @@ struct QueryResultFunctionData final : FunctionData {
 	}
 };
 
-struct QueryResultState final : GlobalTableFunctionState {
+struct QueryResultGlobalState final : GlobalTableFunctionState {
 
 	bool has_result;
-	unique_ptr<MaterializedQueryResult> result;
-	QueryResultState() : has_result(false) {
+	unique_ptr<materialized_result_t> result;
+	QueryResultGlobalState() : has_result(false) {
 	}
 
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		return make_uniq<QueryResultState>();
+		return make_uniq<QueryResultGlobalState>();
 	}
 };
 
@@ -201,21 +232,7 @@ static unique_ptr<FunctionData> QueryResultBind(ClientContext &context, TableFun
 	ExecutePrecedingStatements(conn, context, statements);
 
 	// Execute the last statement
-	auto pending = conn.PendingQuery(std::move(statements.back()));
-	PendingExecutionResult status;
-	do {
-		status = pending->ExecuteTask();
-		if (ClientContextIsInterrupted(context)) {
-			conn.Interrupt();
-			throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
-		}
-	} while (!PendingQueryResult::IsResultReady(status) &&
-	         status != PendingExecutionResult::EXECUTION_ERROR);
-	auto query_result = pending->Execute();
-	if (query_result->HasError()) {
-		throw Exception(query_result->GetErrorObject().Type(), query_result->GetErrorObject().RawMessage());
-	}
-	auto result = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(query_result));
+	auto result = ExecuteInterruptibly(conn, context, std::move(statements.back()));
 
 #if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
 	const auto &result_types = result->GetTypes();

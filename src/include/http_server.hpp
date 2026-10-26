@@ -6,6 +6,7 @@
 #include "execution_request.hpp"
 #include "files.hpp"
 #include "http_error_data.hpp"
+#include "large_stack_thread_pool.hpp"
 #include "result.hpp"
 #include "setup.hpp"
 #include "table_functions_bind_data.hpp"
@@ -53,6 +54,7 @@ static void openURL(const std::string& url) {
 class DashHttpServer {
 public:
 	DashHttpServer() {
+		server.new_task_queue = [] { return new LargeStackThreadPool(CPPHTTPLIB_THREAD_POOL_COUNT); };
 		server.Post("/api/query", [this](const Request &req, Response &res) { ExecuteQuery(req, res); });
 		server.Post("/api/cancel", [this](const Request &req, Response &res) { CancelAllQueries(req, res); });
 		server.Post("/api/write-file", [this](const Request &req, Response &res) { WriteFile(req, res); });

@@ -146,18 +146,26 @@ private:
 		return duckdb_fmt::format(query_template, data_source);
 	}
 
+	static Value FirstValue(QueryResult &result) {
+#if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
+		return result.Collection().GetValue(0, 0);
+#else
+		return result.Cast<MaterializedQueryResult>().GetValue(0, 0);
+#endif
+	}
+
 	static Result<std::nullptr_t> RespondWithJson(Connection &conn, const string &data_source, Response &res) {
 		auto result = conn.Query(JsonQuery(data_source));
 		if (result->HasError()) {
 			return {BadRequest_400, result->GetErrorObject()};
 		}
-		res.set_content(result->GetValue(0, 0).ToString(), "application/json");
+		res.set_content(FirstValue(*result).ToString(), "application/json");
 		return nullptr;
 	}
 
 	// A statement that already ran cannot be re-run inside the JSON wrapper, so its result is bound
 	// back into SQL as an in-memory relation and serialized by the same template.
-	static Result<std::nullptr_t> RespondWithResult(Connection &conn, unique_ptr<MaterializedQueryResult> result,
+	static Result<std::nullptr_t> RespondWithResult(Connection &conn, unique_ptr<materialized_result_t> result,
 	                                                Response &res) {
 		// CreateView takes a bare identifier; everything referencing it qualifies the temp schema so
 		// a user's USE cannot move the lookup elsewhere.
@@ -179,8 +187,7 @@ private:
 		if (json_error.HasError()) {
 			return {BadRequest_400, json_error};
 		}
-		auto materialized = unique_ptr_cast<QueryResult, MaterializedQueryResult>(std::move(json_result));
-		res.set_content(materialized->GetValue(0, 0).ToString(), "application/json");
+		res.set_content(FirstValue(*json_result).ToString(), "application/json");
 		return nullptr;
 	}
 

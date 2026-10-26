@@ -156,10 +156,10 @@ inline void HttpRequest(ClientContext &context, TableFunctionInput &data, DataCh
 inline TableFunction GetHttpRequestFunction() {
 	TableFunction function("dash_http", {LogicalType::VARCHAR, LogicalType::VARCHAR}, HttpRequest, BindHttpRequest,
 	                       RunOnceGlobalTableFunctionState::Init);
-	function.named_parameters["body"] = LogicalType::VARCHAR;
-	function.named_parameters["content_type"] = LogicalType::VARCHAR;
-	function.named_parameters["headers"] = LogicalType::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR);
-	function.named_parameters["files"] = LogicalType::LIST(LogicalType::VARCHAR);
+	AddNamedParameter(function, "body", LogicalType::VARCHAR);
+	AddNamedParameter(function, "content_type", LogicalType::VARCHAR);
+	AddNamedParameter(function, "headers", LogicalType::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR));
+	AddNamedParameter(function, "files", LogicalType::LIST(LogicalType::VARCHAR));
 	return function;
 }
 
