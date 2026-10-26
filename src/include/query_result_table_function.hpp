@@ -2,7 +2,9 @@
 
 #include "dash_extension.hpp"
 #include "duckdb.hpp"
+#include "duckdb/catalog/catalog_search_path.hpp"
 #include "duckdb/common/exception.hpp"
+#include "duckdb/main/client_data.hpp"
 #include "duckdb/main/prepared_statement_data.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/tableref/subqueryref.hpp"
@@ -21,7 +23,7 @@ static bool ClientContextIsInterrupted(ClientContext &context) {
 // Returns true if a statement type does not modify the catalog or data, meaning
 // it's safe to execute on a separate connection without affecting SubqueryRef
 // binding on the main transaction (which can't see DDL/DML from other transactions
-// due to MVCC snapshot isolation).
+// due to MVCC snapshot isolation). Session changes such as SET or USE are copied back.
 static bool IsReadOnlyStatementType(StatementType type) {
 	switch (type) {
 	case StatementType::SELECT_STATEMENT:
@@ -38,10 +40,9 @@ static bool IsReadOnlyStatementType(StatementType type) {
 	}
 }
 
-// Check whether all preceding statements are read-only (settings, pragmas, selects).
-// If so, the SubqueryRef optimization is safe because the last SELECT doesn't depend
-// on catalog/data changes from the preceding statements.
-static bool PrecedingStatementsAreReadOnly(ClientContext &context, const vector<unique_ptr<SQLStatement>> &parsed) {
+// Check whether all preceding statements can run on a helper connection without changing what
+// the last SELECT sees. If so, the SubqueryRef optimization is safe.
+static bool PrecedingStatementsAreReadOnly(const vector<unique_ptr<SQLStatement>> &parsed) {
 	for (idx_t i = 0; i < parsed.size() - 1; i++) {
 		if (!IsReadOnlyStatementType(parsed[i]->type)) {
 			return false;
@@ -50,6 +51,17 @@ static bool PrecedingStatementsAreReadOnly(ClientContext &context, const vector<
 	return true;
 }
 
+// Give `target` the session state of `source`: settings, variables and search path.
+static void CopySessionState(ClientContext &source, ClientContext &target) {
+	target.config = source.config;
+	const auto &set_paths = ClientData::Get(source).catalog_search_path->GetSetPaths();
+	auto &target_path = *ClientData::Get(target).catalog_search_path;
+	if (set_paths.empty()) {
+		target_path.Reset();
+	} else {
+		target_path.Set(set_paths, CatalogSetPathType::SET_DIRECTLY);
+	}
+}
 
 static Parser MakeParser(ClientContext &context) {
 #if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
@@ -57,29 +69,6 @@ static Parser MakeParser(ClientContext &context) {
 #else
 	return Parser(context.GetParserOptions());
 #endif
-}
-
-static unique_ptr<SubqueryRef> ParseSubquery(const string &query, ClientContext &context, const string &err_msg) {
-	auto parser = MakeParser(context);
-	parser.ParseQuery(query);
-	if (parser.statements.size() != 1) {
-		throw ParserException(err_msg);
-	}
-
-	auto &stmt = parser.statements[0];
-
-	if (stmt->type == StatementType::SELECT_STATEMENT) {
-		// Regular SELECT statement
-		auto select_stmt = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(stmt));
-		return duckdb::make_uniq<SubqueryRef>(std::move(select_stmt));
-	} else if (stmt->type == StatementType::MULTI_STATEMENT) {
-		// MultiStatement (e.g., from PIVOT statements that create enum types)
-		throw ParserException(
-			"PIVOT statements without explicit IN clauses are not supported in query() function. "
-			"Please specify the pivot values explicitly, e.g.: PIVOT ... ON col IN (val1, val2, ...)");
-	} else {
-		throw ParserException(err_msg);
-	}
 }
 
 // Run `statement` to completion on `conn`, interrupting it when `context` is interrupted.
@@ -154,15 +143,17 @@ static unique_ptr<TableRef> QueryResultBindReplace(ClientContext &context, Table
 	}
 
 	auto &last = parser.statements.back();
-	if (last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(context, parser.statements)) {
-		// Safe to execute preceding read-only statements on a separate connection
-		// and return the last SELECT as a SubqueryRef
+	if (last->type == StatementType::SELECT_STATEMENT && PrecedingStatementsAreReadOnly(parser.statements)) {
 		if (parser.statements.size() > 1) {
+			// The helper connection starts from the caller's session and hands it back, so a SET
+			// or USE among the preceding statements applies to the last SELECT.
 			Connection conn(*context.db);
+			CopySessionState(context, *conn.context);
 			ExecutePrecedingStatements(conn, context, parser.statements);
+			CopySessionState(*conn.context, context);
 		}
-		auto subquery_ref = ParseSubquery(query, context, "Expected a single SELECT statement");
-		return std::move(subquery_ref);
+		auto select_stmt = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(last));
+		return make_uniq<SubqueryRef>(std::move(select_stmt));
 	}
 
 	// Preceding statements modify catalog/data, or last is not SELECT — fall through
