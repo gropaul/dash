@@ -137,6 +137,25 @@ statement error
 SELECT * FROM qr_test5;
 ----
 
+# Errors surface with their own type and message, from the last and from a preceding statement
+statement error
+FROM query_result('CREATE TABLE IF NOT EXISTS qr_err (i INT); SELECT * FROM qr_no_such_table');
+----
+<REGEX>:^Catalog Error: Table with name qr_no_such_table does not exist.*
+
+statement error
+FROM query_result('SELECT * FROM qr_no_such_table; CREATE TABLE IF NOT EXISTS qr_err (i INT)');
+----
+<REGEX>:^Catalog Error: Table with name qr_no_such_table does not exist.*
+
+statement error
+FROM query_result('CREATE TABLE IF NOT EXISTS qr_err (i INT); SELECT 1 +');
+----
+<REGEX>:^Parser Error:.*
+
+statement ok
+DROP TABLE IF EXISTS qr_err;
+
 # cleanup
 statement ok
 DROP TABLE IF EXISTS qr_test1;

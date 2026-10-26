@@ -87,15 +87,17 @@ static unique_ptr<materialized_result_t> ExecuteInterruptibly(Connection &conn, 
                                                              unique_ptr<SQLStatement> statement) {
 #if DUCKDB_CURRENT_VERSION >= DUCKDB_VERSION_ENCODE(2, 0, 0)
 	auto result = conn.Submit(std::move(statement));
-	result->Materialize();
-	QueryResultState status;
-	do {
-		status = result->ExecuteTask();
-		if (ClientContextIsInterrupted(context)) {
-			conn.Interrupt();
-			throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
-		}
-	} while (!IsTerminal(status));
+	if (!result->HasError()) {
+		result->Materialize();
+		QueryResultState status;
+		do {
+			status = result->ExecuteTask();
+			if (ClientContextIsInterrupted(context)) {
+				conn.Interrupt();
+				throw Exception(ExceptionType::INTERRUPT, "Query interrupted");
+			}
+		} while (!IsTerminal(status));
+	}
 	if (result->HasError()) {
 		throw Exception(result->GetErrorObject().Type(), result->GetErrorObject().RawMessage());
 	}
